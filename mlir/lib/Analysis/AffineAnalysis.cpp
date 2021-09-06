@@ -1034,18 +1034,24 @@ DependenceResult mlir::checkMemrefAccessDependence(
   if (failed(getOpIndexSet(dstAccess.opInst, &dstDomain)))
     return DependenceResult::Failure;
 
-  // Return 'NoDependence' if loopDepth > numCommonLoops and if the ancestor
-  // operation of 'srcAccess' does not properly dominate the ancestor
-  // operation of 'dstAccess' in the same common operation block.
-  // Note: this check is skipped if 'allowRAR' is true, because because RAR
-  // deps can exist irrespective of lexicographic ordering b/w src and dst.
+  // Return 'NoDependence' if loopDepth > numCommonLoops + 1 or if loopDepth ==
+  // numCommonLoops + 1 and the ancestor operation of 'srcAccess' does not
+  // properly dominate the ancestor operation of 'dstAccess' in the same common
+  // operation block. Note: this check is skipped if 'allowRAR' is true, because
+  // because RAR deps can exist irrespective of lexicographic ordering b/w src
+  // and dst.
   unsigned numCommonLoops = getNumCommonLoops(srcDomain, dstDomain);
   assert(loopDepth <= numCommonLoops + 1);
-  if (!allowRAR && loopDepth > numCommonLoops &&
-      !srcAppearsBeforeDstInAncestralBlock(srcAccess, dstAccess, srcDomain,
-                                           numCommonLoops)) {
-    return DependenceResult::NoDependence;
+  if (!allowRAR) {
+    if (loopDepth > numCommonLoops + 1)
+      return DependenceResult::NoDependence;
+
+    if (loopDepth == numCommonLoops + 1 &&
+        !srcAppearsBeforeDstInAncestralBlock(srcAccess, dstAccess, srcDomain,
+                                             numCommonLoops))
+      return DependenceResult::NoDependence;
   }
+
   // Build dim and symbol position maps for each access from access operand
   // Value to position in merged constraint system.
   ValuePositionMap valuePosMap;
