@@ -1757,6 +1757,38 @@ void FlatAffineConstraints::removeRedundantConstraints() {
   equalities.resizeVertically(pos);
 }
 
+/// Converts identifiers in the column range [idStart, idLimit) to local
+/// variables
+void FlatAffineConstraints::convertDimToLocal(unsigned dimStart,
+    unsigned dimLimit) {
+  assert(dimStart >= 0 && dimLimit <= getNumDimIds() &&
+         "Invalid dim pos range");
+
+  if (dimStart >= dimLimit)
+    return;
+
+  // Append new local variables
+  unsigned convertCount = dimLimit - dimStart;
+  unsigned newLocalIdStart = getNumIds();
+  appendLocalId(convertCount);
+
+  // Swap the new local variables with dimensions
+  for (unsigned i = 0; i < convertCount; ++i)
+    swapId(i + dimStart, i + newLocalIdStart);
+
+  // Remove dimensions
+  removeIdRange(dimStart, dimLimit);
+}
+
+/// Merge local ids of `this` and `other`. This is done by appending local ids
+/// of `other` to `this` and inserting local ids of `this` to `other` at start
+/// of its local ids.
+void FlatAffineConstraints::toCommonLocalSpace(FlatAffineConstraints &other) {
+  unsigned initLocals = getNumLocalIds();
+  insertLocalId(getNumLocalIds(), other.getNumLocalIds());
+  other.insertLocalId(0, initLocals);
+}
+
 std::pair<AffineMap, AffineMap> FlatAffineConstraints::getLowerAndUpperBound(
     unsigned pos, unsigned offset, unsigned num, unsigned symStartPos,
     ArrayRef<AffineExpr> localExprs, MLIRContext *context) const {
@@ -3434,4 +3466,130 @@ AffineMap mlir::alignAffineMapWithValues(AffineMap map, ValueRange operands,
 
   return map.replaceDimsAndSymbols(dimReplacements, symReplacements,
                                    dims.size(), numSymbols);
+}
+
+FlatAffineValueConstraints FlatAffineRelation::getDomainSet() const {
+  // Create a copy this object
+  FlatAffineValueConstraints domain = *this;
+
+  // Convert all range variables to local variables
+  domain.convertDimToLocal(
+      getNumDomainDims(), getNumDomainDims() + getNumRangeDims());
+
+  return domain;
+}
+
+FlatAffineValueConstraints FlatAffineRelation::getRangeSet() const {
+  // Create a copy this object
+  FlatAffineValueConstraints range = *this;
+
+  // Convert all domain variables to local variables
+  range.convertDimToLocal(0, getNumDomainDims());
+
+  return range;
+}
+
+/// If `other`: `(domainOther -> rangeOther)`
+/// and `this`: `(domainThis -> rangeThis)`
+/// Then, result of this operation is composition of `other` and `this`:
+/// `other(this)`: `(domainOther -> rangeThis)`
+/// 
+/// The domain of `this` and range of `other` must match.
+void FlatAffineRelation::compose(const FlatAffineRelation &other) {
+  assert(getNumDomainDims() == other.getNumRangeDims() &&
+         "Domain of this and range of other do not match");
+  assert(std::equal(values.begin(), values.begin() + getNumDomainDims(),
+                    other.values.begin() + other.getNumDomainDims()) &&
+         "Domain of this and range of other do not match");
+
+  // Create copy of `other` to `rel`
+  FlatAffineRelation rel = other;
+
+  // Bring both to common local space
+  toCommonLocalSpace(rel);
+
+  // Save values of domain and rel's range
+  auto thisMaybeValues = getMaybeDimValues();
+  auto relMaybeValues = rel.getMaybeDimValues();
+
+  // Convert domain of `this` and range of `rel` to local identifiers. 
+  // Local ids should be appended at the end since they both should match.
+  convertDimToLocal(0, getNumDomainDims());
+  rel.convertDimToLocal(rel.getNumDomainDims(),
+                        rel.getNumDomainDims() + rel.getNumRangeDims());
+
+  // Add and match domain of `rel` to domain of `this`
+  appendDomainId(rel.getNumDomainDims());
+  for (unsigned i = 0, e = rel.getNumDomainDims(); i < e; ++i)
+    if (relMaybeValues[i].hasValue())
+      setValue(i, relMaybeValues[i].getValue());
+
+  // TODO: Iteration is fucked here. Fix
+  // Add and match range of `this` to range of `rel`
+  rel.appendRangeId(getNumRangeDims());
+  for (unsigned i = getNumDomainDims(), e = getNumDimIds(); i < e; ++i)
+    if (thisMaybeValues[i].hasValue())
+      rel.setValue(i, thisMaybeValues[i].getValue());
+
+  // Append `rel` to `this`
+  append(rel);
+}
+
+/// Swap domain and range of the relation
+void FlatAffineRelation::inverse() {
+  // Add new range ids
+  unsigned oldDomain = getNumDomainDims();
+  unsigned oldRange = getNumRangeDims();
+  appendRangeId(oldDomain);
+
+  // Swap new ids with domain
+  for (unsigned i = 0; i < oldDomain; ++i)
+    swapId(i, oldDomain + oldRange + i);
+
+  // Remove the swapped domain
+  removeIdRange(0, oldDomain);
+
+  // Set domain and range as inverse
+  numDomainDims = oldRange;
+  numRangeDims = oldDomain;
+}
+
+// TODO: Change this if insertDimId automatically does this.
+void FlatAffineRelation::appendDomainId(unsigned num) {
+  insertDimId(getNumDomainDims(), num);
+  numDomainDims += num;
+}
+
+void FlatAffineRelation::appendRangeId(unsigned num) {
+  insertDimId(getNumDimIds(), num);
+  numRangeDims += num;
+}
+
+/// Removes identifiers in the column range [idStart, idLimit), and copies any
+/// remaining valid data into place, updates member variables, and resizes
+/// arrays as needed.
+void FlatAffineRelation::removeIdRange(unsigned idStart, unsigned idLimit) {
+  FlatAffineValueConstraints::removeIdRange(idStart, idLimit);
+
+  if (idStart >= idLimit)
+    return;
+
+  // domain and range dimensions to remove are computed by calculating
+  // intersection with of removed ids range
+  unsigned domainDimsToRemove =
+      std::min(idLimit, getNumDomainDims()) - idStart;
+  unsigned rangeDimsToRemove =
+      std::min(idLimit, getNumDomainDims() + getNumRangeDims()) -
+      std::max(idStart, getNumDomainDims());
+
+  if (domainDimsToRemove > 0)
+    numDomainDims -= domainDimsToRemove;
+  if (rangeDimsToRemove > 0)
+    numRangeDims -= rangeDimsToRemove;
+}
+
+void FlatAffineRelation::dumpRel() const {
+  llvm::errs() << "\n";
+  llvm::errs() << getNumDomainDims() << " -> " << getNumRangeDims();
+  dump();
 }

@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "mlir/Analysis/AffineStructures.h"
+#include "mlir/Analysis/PresburgerSet.h"
 #include "mlir/IR/IntegerSet.h"
 #include "mlir/IR/MLIRContext.h"
 
@@ -709,6 +710,39 @@ TEST(FlatAffineConstraintsTest, computeLocalReprRecursive) {
 
   // Check if floordivs which may depend on other floordivs can be computed.
   checkDivisionRepresentation(fac, divisions, denoms);
+}
+
+// TODO: Use equality checks after that patch is upstreamed
+FlatAffineRelation
+makeRelationFromConstraints(unsigned domainDims, unsigned rangeDims,
+                            ArrayRef<SmallVector<int64_t, 4>> ineqs,
+                            ArrayRef<SmallVector<int64_t, 4>> eqs,
+                            unsigned syms = 0) {
+  FlatAffineConstraints fac =
+      makeFACFromConstraints(domainDims + rangeDims + syms, ineqs, eqs, syms);
+  return FlatAffineRelation(domainDims, rangeDims, fac);
+}
+
+TEST(FlatAffineRelationTest, composeTest) {
+  // Build relation (y -> z : y = 2z)
+  FlatAffineRelation rel1 =
+      makeRelationFromConstraints(1, 1, {}, {{1, -2, 0}});
+
+  // Build relation (x -> y : 3x = y)
+  FlatAffineRelation rel2 =
+      makeRelationFromConstraints(1, 1, {}, {{3, -1, 0}});
+
+  // Final relation should be (x -> z : 3x = 2z)
+  rel1.compose(rel2);
+}
+
+TEST(FlatAffineRelationTest, inverseTest) {
+  // Build relation (x, y -> z : z = x + y and z >= 0 and z <= s)
+  FlatAffineRelation rel1 = makeRelationFromConstraints(
+      2, 1, {{0, 0, 1, 0, 0}, {0, 0, -1, 1, 0}}, {{1, 1, -1, 0, 0}}, 1);
+
+  // Final relation should be (z -> x, y : z = x + y and z >= 0 and z <= s)
+  rel1.inverse();
 }
 
 } // namespace mlir

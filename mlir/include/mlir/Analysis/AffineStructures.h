@@ -416,6 +416,15 @@ public:
   /// O(VC) time.
   void removeRedundantConstraints();
 
+  /// Converts identifiers in the column range [idStart, idLimit) to local
+  /// variables
+  void convertDimToLocal(unsigned dimStart, unsigned dimLimit);
+
+  /// Merge local ids of `this` and `other`. This is done by appending local ids
+  /// of `other` to `this` and inserting local ids of `this` to `other` at start
+  /// of its local ids.
+  void toCommonLocalSpace(FlatAffineConstraints &other);
+
   /// Removes all equalities and inequalities.
   void clearConstraints();
 
@@ -552,6 +561,16 @@ public:
                                        numLocals + 1,
                                    numDims, numSymbols, numLocals, valArgs) {}
 
+  FlatAffineValueConstraints(const FlatAffineConstraints &fac,
+                             ArrayRef<Optional<Value>> valArgs = {})
+      : FlatAffineConstraints(fac) {
+    assert(valArgs.empty() || valArgs.size() == numIds);
+    if (valArgs.empty())
+      values.resize(numIds, None);
+    else
+      values.append(valArgs.begin(), valArgs.end());
+  }
+
   /// Create a flat affine constraint system from an AffineValueMap or a list of
   /// these. The constructed system will only include equalities.
   explicit FlatAffineValueConstraints(const AffineValueMap &avm);
@@ -678,7 +697,8 @@ public:
   using FlatAffineConstraints::insertDimId;
   unsigned insertSymbolId(unsigned pos, ValueRange vals);
   using FlatAffineConstraints::insertSymbolId;
-  unsigned insertId(IdKind kind, unsigned pos, unsigned num = 1) override;
+  virtual unsigned insertId(IdKind kind, unsigned pos,
+                            unsigned num = 1) override;
   unsigned insertId(IdKind kind, unsigned pos, ValueRange vals);
 
   /// Append identifiers of the specified kind after the last identifier of that
@@ -834,7 +854,7 @@ protected:
   /// Removes identifiers in the column range [idStart, idLimit), and copies any
   /// remaining valid data into place, updates member variables, and resizes
   /// arrays as needed.
-  void removeIdRange(unsigned idStart, unsigned idLimit) override;
+  virtual void removeIdRange(unsigned idStart, unsigned idLimit) override;
 
   /// Eliminates the identifier at the specified position using Fourier-Motzkin
   /// variable elimination, but uses Gaussian elimination if there is an
@@ -851,6 +871,91 @@ protected:
   /// Temporary ones or those that aren't associated with any Value are set to
   /// None.
   SmallVector<Optional<Value>, 8> values;
+};
+
+// TODO: Change addId and removeIdRange to modify numDomainDims and
+// numRangeDims.
+class FlatAffineRelation : public FlatAffineValueConstraints {
+public:
+  FlatAffineRelation(unsigned numReservedInequalities,
+                     unsigned numReservedEqualities, unsigned numReservedCols,
+                     unsigned numDomainDims, unsigned numRangeDims,
+                     unsigned numSymbols, unsigned numLocals,
+                     ArrayRef<Optional<Value>> valArgs = {})
+      : FlatAffineValueConstraints(
+            numReservedInequalities, numReservedEqualities, numReservedCols,
+            numDomainDims + numRangeDims, numSymbols, numLocals, valArgs),
+        numDomainDims(numDomainDims), numRangeDims(numRangeDims) {}
+
+  FlatAffineRelation(unsigned numDomainDims = 0, unsigned numRangeDims = 0,
+                     unsigned numSymbols = 0, unsigned numLocals = 0)
+      : FlatAffineValueConstraints(numDomainDims + numRangeDims, numSymbols,
+                                   numLocals),
+        numDomainDims(numDomainDims), numRangeDims(numRangeDims) {}
+
+  FlatAffineRelation(unsigned numDomainDims, unsigned numRangeDims,
+                     FlatAffineValueConstraints &fac)
+      : FlatAffineValueConstraints(fac), numDomainDims(numDomainDims),
+        numRangeDims(numRangeDims) {}
+
+  FlatAffineRelation(unsigned numDomainDims, unsigned numRangeDims,
+                     FlatAffineConstraints &fac)
+      : FlatAffineValueConstraints(fac), numDomainDims(numDomainDims),
+        numRangeDims(numRangeDims) {}
+
+  /// Create a FlatAffineValueConstraints object containing the set
+  /// corresponding to domain/range of the relation.
+  FlatAffineValueConstraints getDomainSet() const;
+  FlatAffineValueConstraints getRangeSet() const;
+
+  inline unsigned getNumDomainDims() const { return numDomainDims; }
+  inline unsigned getNumRangeDims() const { return numRangeDims; }
+
+  /// If `rel`: `(domainRel -> rangeRel)`
+  /// and `this`: `(domainThis -> rangeRel)`
+  /// Then, result of this operation is composition of `rel` and `this`:
+  /// `rel(this)`: `(domainRel -> rangeThis)`
+  /// 
+  /// The domain of `this` and range of `rel` must match.
+  void compose(const FlatAffineRelation &other);
+
+  /// Swap domain and range of the relation
+  /// (domain -> range) converts to (range -> domain)
+  void inverse();
+
+  static FlatAffineRelation getIdentity(unsigned numDomainDims = 0,
+                                        unsigned numRangeDims = 0,
+                                        unsigned numSymbols = 0) {
+    return FlatAffineRelation(numDomainDims, numRangeDims, numSymbols);
+  }
+
+  void insertDomainId(unsigned pos, unsigned num = 1);
+  void insertRangeId(unsigned pos, unsigned num = 1);
+
+  void appendDomainId(unsigned num = 1);
+  void appendRangeId(unsigned num = 1);
+
+  void dumpRel() const;
+
+protected:
+  unsigned numDomainDims, numRangeDims;
+
+  /// Insert identifiers of the specified kind at position `pos`. Positions are
+  /// relative to the kind of identifier. The coefficient columns corresponding
+  /// to the added identifiers are initialized to zero. `vals` are the Values
+  /// corresponding to the identifiers. Return the absolute column position
+  /// (i.e., not relative to the kind of identifier) of the first added
+  /// identifier.
+  ///
+  /// Note: Empty Values are allowed in `vals`.
+  ///
+  /// For IdKind::Dimension, ids added 
+  /* unsigned insertId(IdKind kind, unsigned pos, unsigned num = 1) override; */
+
+  /// Removes identifiers in the column range [idStart, idLimit), and copies any
+  /// remaining valid data into place, updates member variables, and resizes
+  /// arrays as needed.
+  void removeIdRange(unsigned idStart, unsigned idLimit) override;
 };
 
 /// Flattens 'expr' into 'flattenedExpr', which contains the coefficients of the
