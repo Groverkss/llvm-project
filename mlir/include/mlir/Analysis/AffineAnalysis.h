@@ -85,6 +85,8 @@ struct MemRefAccess {
   // Returns true if this access is of a store op.
   bool isStore() const;
 
+  void getAccessRelation() const;
+
   /// Populates 'accessMap' with composition of AffineApplyOps reachable from
   /// 'indices'.
   void getAccessMap(AffineValueMap *accessMap) const;

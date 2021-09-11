@@ -548,6 +548,31 @@ static void turnSymbolIntoDim(FlatAffineValueConstraints *cst, Value id) {
   }
 }
 
+void FlatAffineValueConstraints::toCommonSymbolSpace(
+    FlatAffineValueConstraints &other) {
+
+  SmallVector<Value, 4> aSymValues;
+  getValues(getNumDimIds(), getNumDimAndSymbolIds(),
+                   &aSymValues);
+
+  // Merge symbols: merge symbols into `other` first from `this`.
+  unsigned s = other.getNumDimIds();
+  for (auto aSymValue : aSymValues) {
+    unsigned loc;
+    if (other.findId(aSymValue, &loc))
+      other.swapId(s, loc);
+    else
+      other.insertSymbolId(s - other.getNumDimIds(), aSymValue);
+    s++;
+  }
+
+  // Symbols that are in other, but not in this, are added at the end.
+  for (unsigned t = other.getNumDimIds() + getNumSymbolIds(),
+                e = other.getNumDimAndSymbolIds();
+       t < e; t++)
+    insertSymbolId(getNumSymbolIds(), other.getValue(t));
+}
+
 // Changes all symbol identifiers which are loop IVs to dim identifiers.
 void FlatAffineValueConstraints::convertLoopIVSymbolsToDims() {
   // Gather all symbols which are loop IVs.
@@ -3493,24 +3518,19 @@ FlatAffineValueConstraints FlatAffineRelation::getRangeSet() const {
 /// and `this`: `(domainThis -> rangeThis)`
 /// Then, result of this operation is composition of `other` and `this`:
 /// `other(this)`: `(domainOther -> rangeThis)`
-/// 
-/// The domain of `this` and range of `other` must match.
+///
+/// The domain of `this` and range of `other` must match. Symbols and local
+/// variables should also match.
 void FlatAffineRelation::compose(const FlatAffineRelation &other) {
   assert(getNumDomainDims() == other.getNumRangeDims() &&
          "Domain of this and range of other do not match");
   assert(std::equal(values.begin(), values.begin() + getNumDomainDims(),
                     other.values.begin() + other.getNumDomainDims()) &&
          "Domain of this and range of other do not match");
+  assert(getNumLocalIds() == other.getNumLocalIds());
 
   // Create copy of `other` to `rel`
   FlatAffineRelation rel = other;
-
-  // Bring both to common local space
-  toCommonLocalSpace(rel);
-
-  // Save values of domain and rel's range
-  auto thisMaybeValues = getMaybeDimValues();
-  auto relMaybeValues = rel.getMaybeDimValues();
 
   // Convert domain of `this` and range of `rel` to local identifiers. 
   // Local ids should be appended at the end since they both should match.
@@ -3518,18 +3538,25 @@ void FlatAffineRelation::compose(const FlatAffineRelation &other) {
   rel.convertDimToLocal(rel.getNumDomainDims(),
                         rel.getNumDomainDims() + rel.getNumRangeDims());
 
-  // Add and match domain of `rel` to domain of `this`
+  // Add dimensions such that both relations become `domainOther -> rangeThis`
   appendDomainId(rel.getNumDomainDims());
+  rel.appendRangeId(getNumRangeDims());
+
+  // Get values of domain and rel's range
+  auto thisMaybeValues = getMaybeDimValues();
+  auto relMaybeValues = rel.getMaybeDimValues();
+
+  // Add and match domain of `rel` to domain of `this`
   for (unsigned i = 0, e = rel.getNumDomainDims(); i < e; ++i)
     if (relMaybeValues[i].hasValue())
       setValue(i, relMaybeValues[i].getValue());
 
-  // TODO: Iteration is fucked here. Fix
   // Add and match range of `this` to range of `rel`
-  rel.appendRangeId(getNumRangeDims());
-  for (unsigned i = getNumDomainDims(), e = getNumDimIds(); i < e; ++i)
-    if (thisMaybeValues[i].hasValue())
-      rel.setValue(i, thisMaybeValues[i].getValue());
+  for (unsigned i = 0, e = getNumRangeDims(); i < e; ++i) {
+    unsigned rangeIdx = rel.getNumDomainDims() + i;
+    if (thisMaybeValues[rangeIdx].hasValue())
+      rel.setValue(rangeIdx, thisMaybeValues[rangeIdx].getValue());
+  }
 
   // Append `rel` to `this`
   append(rel);

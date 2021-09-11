@@ -845,6 +845,9 @@ public:
       setValue(i, values[i - start]);
   }
 
+  // TODO: Add docs, asserts for symbols
+  void toCommonSymbolSpace(FlatAffineValueConstraints &other);
+
 protected:
   /// Returns false if the fields corresponding to various identifier counts, or
   /// equality/inequality buffer sizes aren't consistent; true otherwise. This

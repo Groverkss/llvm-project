@@ -893,6 +893,115 @@ static void computeDirectionVector(
   }
 }
 
+// TODO: Add docs
+static unsigned addAccessLocalVars(FlatAffineRelation &accessRel,
+                                   const AffineValueMap &accessValueMap,
+                                   FlatAffineValueConstraints &cst) {
+  // Set Values in cst
+  for (unsigned i = 0, e = accessValueMap.getNumOperands(); i < e; ++i)
+    cst.setValue(i, accessValueMap.getOperand(i));
+
+  // Add local variables to accessRel
+  unsigned localOffset = accessRel.getNumIds();
+  accessRel.appendLocalId(cst.getNumLocalIds());
+
+  // Add inequalities from cst to accessRel
+  for (unsigned i = 0, e = cst.getNumInequalities(); i < e; ++i) {
+    SmallVector<int64_t, 8> newIneq(accessRel.getNumCols(), 0);
+
+    // Set identifier coefficients
+    for (unsigned j = 0, e = cst.getNumDimAndSymbolIds(); j < e; ++j) {
+      unsigned operandPos;
+      accessRel.findId(cst.getValue(j), &operandPos);
+      newIneq[operandPos] = cst.atIneq(i, j);
+    }
+
+    // Local terms.
+    for (unsigned j = 0, e = cst.getNumLocalIds(); j < e; j++)
+      newIneq[localOffset + j] = cst.atIneq(i, cst.getNumDimAndSymbolIds());
+    // Set constant term.
+    newIneq[newIneq.size() - 1] = cst.atIneq(i, cst.getNumCols() - 1);
+  }
+
+  return localOffset;
+}
+
+void MemRefAccess::getAccessRelation() const {
+  // Create domain of access
+  FlatAffineValueConstraints domain;
+  getOpIndexSet(opInst, &domain);
+
+  // Create range of access
+  AffineValueMap accessValueMap;
+  getAccessMap(&accessValueMap);
+  FlatAffineValueConstraints range(accessValueMap.getNumResults(),
+                                   accessValueMap.getNumSymbols());
+  for (unsigned i = range.getNumDimIds(); i < range.getNumDimAndSymbolIds();
+       ++i)
+    range.setValue(i, accessValueMap.getOperand(i));
+
+  accessValueMap.getAffineMap().dump();
+
+  // Align domain and range symbols and local variables
+  domain.toCommonSymbolSpace(range);
+  domain.toCommonLocalSpace(range);
+
+  // Build access relation
+  // accessRel: empty -> range
+  // domainRel: domain -> empty
+  // accessRel `compose` rangeRel: domain -> range
+  FlatAffineRelation accessRel(0, range.getNumDimIds(), range);
+  FlatAffineRelation domainRel(domain.getNumDimIds(), 0, domain);
+
+  accessRel.dumpRel();
+  domainRel.dumpRel();
+  accessRel.compose(domainRel);
+
+  // Get flattened expressions
+  std::vector<SmallVector<int64_t, 8>> flatExprs;
+  FlatAffineValueConstraints localVarCst;
+  getFlattenedAffineExprs(accessValueMap.getAffineMap(), &flatExprs,
+                          &localVarCst);
+
+  // Add local ids from access map to accessRelation
+  unsigned newLocalIdOffset =
+      addAccessLocalVars(accessRel, accessValueMap, localVarCst);
+
+  // Get access map operands
+  ArrayRef<Value> operands = accessValueMap.getOperands();
+
+  // Add access constraints to relation as equalities
+  SmallVector<int64_t, 8> eq(accessRel.getNumCols());
+  accessValueMap.getAffineMap().dump();
+  for (unsigned i = 0, e = accessValueMap.getNumResults(); i < e; ++i) {
+    // Zero fill.
+    std::fill(eq.begin(), eq.end(), 0);
+
+    // Flattened AffineExpr for i^th range result.
+    const auto &flatExpr = flatExprs[i];
+    // Set identifier coefficients from access map
+    for (unsigned j = 0, e = operands.size(); j < e; ++j) {
+      unsigned operandPos;
+      accessRel.findId(operands[j], &operandPos);
+      eq[operandPos] = flatExpr[j];
+    }
+
+    // Local terms.
+    for (unsigned j = 0, e = localVarCst.getNumLocalIds(); j < e; j++)
+      eq[newLocalIdOffset + j] =
+          flatExpr[localVarCst.getNumDimAndSymbolIds() + j];
+    // Set constant term.
+    eq[eq.size() - 1] = flatExpr[flatExpr.size() - 1];
+
+    // Set this to the i^th range identifier
+    eq[accessRel.getNumDomainDims() + i] = -1;
+
+    accessRel.addEquality(eq);
+  }
+
+  accessRel.dumpRel();
+}
+
 // Populates 'accessMap' with composition of AffineApplyOps reachable from
 // indices of MemRefAccess.
 void MemRefAccess::getAccessMap(AffineValueMap *accessMap) const {
@@ -1023,6 +1132,24 @@ DependenceResult mlir::checkMemrefAccessDependence(
   // Get composed access function for 'dstAccess'.
   AffineValueMap dstAccessMap;
   dstAccess.getAccessMap(&dstAccessMap);
+
+  srcAccess.getAccessRelation();
+  dstAccess.getAccessRelation();
+
+  /* auto srcMap = srcAccessMap.getAffineMap(); */
+  /* auto dstMap = dstAccessMap.getAffineMap(); */
+
+  /* std::vector<SmallVector<int64_t, 8>> srcFlatExprs; */
+  /* FlatAffineValueConstraints srcLocalVarCst; */
+  /* getFlattenedAffineExprs(srcMap, &srcFlatExprs, &srcLocalVarCst); */
+
+  /* srcLocalVarCst.dump(); */
+  /* for (auto &it: srcFlatExprs) { */
+  /*   for (auto &itr: it) */
+  /*     llvm::errs() << itr << " "; */
+  /*   llvm::errs() << "\n"; */
+  /* } */
+  /* llvm::errs() << "\n"; */
 
   // Get iteration domain for the 'srcAccess' operation.
   FlatAffineValueConstraints srcDomain;
