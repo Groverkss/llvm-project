@@ -918,15 +918,17 @@ static unsigned addAccessLocalVars(FlatAffineRelation &accessRel,
 
     // Local terms.
     for (unsigned j = 0, e = cst.getNumLocalIds(); j < e; j++)
-      newIneq[localOffset + j] = cst.atIneq(i, cst.getNumDimAndSymbolIds());
+      newIneq[localOffset + j] = cst.atIneq(i, cst.getNumDimAndSymbolIds() + j);
     // Set constant term.
     newIneq[newIneq.size() - 1] = cst.atIneq(i, cst.getNumCols() - 1);
+
+    accessRel.addInequality(newIneq);
   }
 
   return localOffset;
 }
 
-void MemRefAccess::getAccessRelation() const {
+FlatAffineRelation MemRefAccess::getAccessRelation() const {
   // Create domain of access
   FlatAffineValueConstraints domain;
   getOpIndexSet(opInst, &domain);
@@ -936,11 +938,9 @@ void MemRefAccess::getAccessRelation() const {
   getAccessMap(&accessValueMap);
   FlatAffineValueConstraints range(accessValueMap.getNumResults(),
                                    accessValueMap.getNumSymbols());
-  for (unsigned i = range.getNumDimIds(); i < range.getNumDimAndSymbolIds();
-       ++i)
-    range.setValue(i, accessValueMap.getOperand(i));
-
-  accessValueMap.getAffineMap().dump();
+  for (unsigned i = 0, e = accessValueMap.getNumSymbols(); i < e; ++i)
+    range.setValue(range.getNumDimIds() + i,
+                   accessValueMap.getOperand(i + accessValueMap.getNumDims()));
 
   // Align domain and range symbols and local variables
   domain.toCommonSymbolSpace(range);
@@ -953,8 +953,6 @@ void MemRefAccess::getAccessRelation() const {
   FlatAffineRelation accessRel(0, range.getNumDimIds(), range);
   FlatAffineRelation domainRel(domain.getNumDimIds(), 0, domain);
 
-  accessRel.dumpRel();
-  domainRel.dumpRel();
   accessRel.compose(domainRel);
 
   // Get flattened expressions
@@ -972,7 +970,6 @@ void MemRefAccess::getAccessRelation() const {
 
   // Add access constraints to relation as equalities
   SmallVector<int64_t, 8> eq(accessRel.getNumCols());
-  accessValueMap.getAffineMap().dump();
   for (unsigned i = 0, e = accessValueMap.getNumResults(); i < e; ++i) {
     // Zero fill.
     std::fill(eq.begin(), eq.end(), 0);
@@ -999,7 +996,7 @@ void MemRefAccess::getAccessRelation() const {
     accessRel.addEquality(eq);
   }
 
-  accessRel.dumpRel();
+  return accessRel;
 }
 
 // Populates 'accessMap' with composition of AffineApplyOps reachable from
@@ -1133,33 +1130,11 @@ DependenceResult mlir::checkMemrefAccessDependence(
   AffineValueMap dstAccessMap;
   dstAccess.getAccessMap(&dstAccessMap);
 
-  srcAccess.getAccessRelation();
-  dstAccess.getAccessRelation();
+  FlatAffineRelation srcRel = srcAccess.getAccessRelation();
+  FlatAffineRelation dstRel = dstAccess.getAccessRelation();
 
-  /* auto srcMap = srcAccessMap.getAffineMap(); */
-  /* auto dstMap = dstAccessMap.getAffineMap(); */
-
-  /* std::vector<SmallVector<int64_t, 8>> srcFlatExprs; */
-  /* FlatAffineValueConstraints srcLocalVarCst; */
-  /* getFlattenedAffineExprs(srcMap, &srcFlatExprs, &srcLocalVarCst); */
-
-  /* srcLocalVarCst.dump(); */
-  /* for (auto &it: srcFlatExprs) { */
-  /*   for (auto &itr: it) */
-  /*     llvm::errs() << itr << " "; */
-  /*   llvm::errs() << "\n"; */
-  /* } */
-  /* llvm::errs() << "\n"; */
-
-  // Get iteration domain for the 'srcAccess' operation.
-  FlatAffineValueConstraints srcDomain;
-  if (failed(getOpIndexSet(srcAccess.opInst, &srcDomain)))
-    return DependenceResult::Failure;
-
-  // Get iteration domain for 'dstAccess' operation.
-  FlatAffineValueConstraints dstDomain;
-  if (failed(getOpIndexSet(dstAccess.opInst, &dstDomain)))
-    return DependenceResult::Failure;
+  FlatAffineValueConstraints srcDomain = srcRel.getDomainSet();
+  FlatAffineValueConstraints dstDomain = dstRel.getDomainSet();
 
   // Return 'NoDependence' if loopDepth > numCommonLoops and if the ancestor
   // operation of 'srcAccess' does not properly dominate the ancestor
@@ -1173,31 +1148,17 @@ DependenceResult mlir::checkMemrefAccessDependence(
                                            numCommonLoops)) {
     return DependenceResult::NoDependence;
   }
-  // Build dim and symbol position maps for each access from access operand
-  // Value to position in merged constraint system.
-  ValuePositionMap valuePosMap;
-  buildDimAndSymbolPositionMaps(srcDomain, dstDomain, srcAccessMap,
-                                dstAccessMap, &valuePosMap,
-                                dependenceConstraints);
-  initDependenceConstraints(srcDomain, dstDomain, srcAccessMap, dstAccessMap,
-                            valuePosMap, dependenceConstraints);
 
-  assert(valuePosMap.getNumDims() ==
-         srcDomain.getNumDimIds() + dstDomain.getNumDimIds());
+  srcRel.toCommonSymbolSpace(dstRel);
+  srcRel.toCommonLocalSpace(dstRel);
+  dstRel.inverse();
+  dstRel.compose(srcRel);
 
-  // Create memref access constraint by equating src/dst access functions.
-  // Note that this check is conservative, and will fail in the future when
-  // local variables for mod/div exprs are supported.
-  if (failed(addMemRefAccessConstraints(srcAccessMap, dstAccessMap, valuePosMap,
-                                        dependenceConstraints)))
-    return DependenceResult::Failure;
+  dependenceConstraints = &dstRel;
 
   // Add 'src' happens before 'dst' ordering constraints.
   addOrderingConstraints(srcDomain, dstDomain, loopDepth,
                          dependenceConstraints);
-  // Add src and dst domain constraints.
-  addDomainConstraints(srcDomain, dstDomain, valuePosMap,
-                       dependenceConstraints);
 
   // Return 'NoDependence' if the solution space is empty: no dependence.
   if (dependenceConstraints->isEmpty()) {

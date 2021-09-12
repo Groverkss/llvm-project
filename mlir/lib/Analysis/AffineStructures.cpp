@@ -976,6 +976,7 @@ bool FlatAffineConstraints::isEmpty() const {
     if (tmpCst.hasInvalidConstraint())
       return true;
   }
+
   return false;
 }
 

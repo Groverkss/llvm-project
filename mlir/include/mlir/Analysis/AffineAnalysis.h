@@ -26,6 +26,7 @@ class AffineApplyOp;
 class AffineForOp;
 class AffineValueMap;
 class FlatAffineValueConstraints;
+class FlatAffineRelation;
 class Operation;
 
 /// A description of a (parallelizable) reduction in an affine loop.
@@ -85,7 +86,7 @@ struct MemRefAccess {
   // Returns true if this access is of a store op.
   bool isStore() const;
 
-  void getAccessRelation() const;
+  FlatAffineRelation getAccessRelation() const;
 
   /// Populates 'accessMap' with composition of AffineApplyOps reachable from
   /// 'indices'.
