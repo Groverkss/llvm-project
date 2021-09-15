@@ -932,9 +932,6 @@ public:
     return FlatAffineRelation(numDomainDims, numRangeDims, numSymbols);
   }
 
-  void insertDomainId(unsigned pos, unsigned num = 1);
-  void insertRangeId(unsigned pos, unsigned num = 1);
-
   void appendDomainId(unsigned num = 1);
   void appendRangeId(unsigned num = 1);
 
