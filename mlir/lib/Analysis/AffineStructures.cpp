@@ -1766,6 +1766,38 @@ void FlatAffineConstraints::removeRedundantConstraints() {
   equalities.resizeVertically(pos);
 }
 
+void FlatAffineConstraints::removeRedundantLocalVars() {
+  normalizeConstraintsByGCD();
+
+  for (int64_t i = 0; i < getNumEqualities(); ++i) {
+    bool foundOne = false;
+    unsigned eliminateVar;
+    for (unsigned j = getNumDimAndSymbolIds(), f = getNumIds(); j < f; ++j) {
+      if (std::abs(atEq(i, j)) == 1) {
+        foundOne = true;
+        eliminateVar = j;
+        break;
+      }
+    }
+
+    if (!foundOne)
+      continue;
+
+    // Use equality to simplify other constraints
+    for (unsigned j = 0, f = getNumEqualities(); j < f; ++j)
+      eliminateFromConstraint(this, j, i, eliminateVar, eliminateVar,
+                              /*isEq=*/true);
+    for (unsigned j = 0, f = getNumInequalities(); j < f; ++j)
+      eliminateFromConstraint(this, j, i, eliminateVar, eliminateVar,
+                              /*isEq=*/false);
+    normalizeConstraintsByGCD();
+    removeId(eliminateVar);
+    removeEquality(i);
+    --i;
+    break;
+  }
+}
+
 /// Converts identifiers in the column range [idStart, idLimit) to local
 /// variables
 void FlatAffineConstraints::convertDimToLocal(unsigned dimStart,
@@ -3544,6 +3576,7 @@ void FlatAffineRelation::compose(const FlatAffineRelation &other) {
 
   // Append `rel` to `this`
   append(rel);
+  removeRedundantLocalVars();
 }
 
 /// Swap domain and range of the relation

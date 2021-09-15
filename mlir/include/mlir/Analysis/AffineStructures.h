@@ -416,6 +416,9 @@ public:
   /// O(VC) time.
   void removeRedundantConstraints();
 
+  /// TODO: Write docs
+  void removeRedundantLocalVars();
+
   /// Converts identifiers in the column range [idStart, idLimit) to local
   /// variables
   void convertDimToLocal(unsigned dimStart, unsigned dimLimit);
