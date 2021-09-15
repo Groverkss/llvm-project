@@ -417,13 +417,11 @@ static void mergeAndAlignIds(unsigned offset, FlatAffineValueConstraints *a,
                      b->getMaybeValues().begin() + b->getNumDimAndSymbolIds(),
                      [](Optional<Value> id) { return id.hasValue(); }));
 
-  // Place local id's of A after local id's of B.
-  b->insertLocalId(/*pos=*/0, /*num=*/a->getNumLocalIds());
-  a->appendLocalId(/*num=*/b->getNumLocalIds() - a->getNumLocalIds());
+  // Bring A and B to common local space
+  a->toCommonLocalSpace(*b);
 
-  SmallVector<Value, 4> aDimValues, aSymValues;
+  SmallVector<Value, 4> aDimValues;
   a->getValues(offset, a->getNumDimIds(), &aDimValues);
-  a->getValues(a->getNumDimIds(), a->getNumDimAndSymbolIds(), &aSymValues);
 
   {
     // Merge dims from A into B.
@@ -448,29 +446,8 @@ static void mergeAndAlignIds(unsigned offset, FlatAffineValueConstraints *a,
            "expected same number of dims");
   }
 
-  {
-    // Merge symbols: merge A's symbols into B first.
-    unsigned s = 0;
-    for (auto aSymValue : aSymValues) {
-      unsigned loc;
-      if (b->findId(aSymValue, &loc)) {
-        assert(loc >= b->getNumDimIds() && loc < b->getNumDimAndSymbolIds() &&
-               "A's symbol appears in B's non-symbol position");
-        b->swapId(s + b->getNumDimIds(), loc);
-      } else {
-        b->insertSymbolId(s, aSymValue);
-      }
-      s++;
-    }
-    // Symbols that are in B, but not in A, are added at the end.
-    for (unsigned t = a->getNumDimAndSymbolIds(),
-                  e = b->getNumDimAndSymbolIds();
-         t < e; t++) {
-      a->appendSymbolId(b->getValue(t));
-    }
-    assert(a->getNumDimAndSymbolIds() == b->getNumDimAndSymbolIds() &&
-           "expected same number of dims and symbols");
-  }
+  // Merge and align symbols of A and B
+  a->toCommonSymbolSpace(*b);
 
   assert(areIdsAligned(*a, *b) && "IDs expected to be aligned");
 }
@@ -559,8 +536,11 @@ void FlatAffineValueConstraints::toCommonSymbolSpace(
   unsigned s = other.getNumDimIds();
   for (auto aSymValue : aSymValues) {
     unsigned loc;
-    if (other.findId(aSymValue, &loc))
+    if (other.findId(aSymValue, &loc)) {
+      assert(loc >= other.getNumDimIds() && loc < getNumDimAndSymbolIds() &&
+             "symbol in `this` appears in other's non-symbol position");
       other.swapId(s, loc);
+    }
     else
       other.insertSymbolId(s - other.getNumDimIds(), aSymValue);
     s++;
@@ -571,6 +551,9 @@ void FlatAffineValueConstraints::toCommonSymbolSpace(
                 e = other.getNumDimAndSymbolIds();
        t < e; t++)
     insertSymbolId(getNumSymbolIds(), other.getValue(t));
+
+  assert(getNumSymbolIds() == other.getNumSymbolIds() &&
+         "expected same number of symbols");
 }
 
 // Changes all symbol identifiers which are loop IVs to dim identifiers.
