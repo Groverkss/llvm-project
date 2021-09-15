@@ -537,9 +537,12 @@ void FlatAffineValueConstraints::toCommonSymbolSpace(
   for (auto aSymValue : aSymValues) {
     unsigned loc;
     if (other.findId(aSymValue, &loc)) {
-      assert(loc >= other.getNumDimIds() && loc < getNumDimAndSymbolIds() &&
-             "symbol in `this` appears in other's non-symbol position");
-      other.swapId(s, loc);
+      // If the id is a symbol in `other`, then align it, otherwise assume that
+      // it is a new symbol
+      if (loc >= other.getNumDimIds() && loc < getNumDimAndSymbolIds())
+        other.swapId(s, loc);
+      else
+        other.insertSymbolId(s - other.getNumDimIds(), aSymValue);
     }
     else
       other.insertSymbolId(s - other.getNumDimIds(), aSymValue);

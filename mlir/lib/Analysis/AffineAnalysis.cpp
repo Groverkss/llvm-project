@@ -700,7 +700,7 @@ DependenceResult mlir::checkMemrefAccessDependence(
   dstRel.inverse();
   dstRel.compose(srcRel);
 
-  dependenceConstraints = &dstRel;
+  *dependenceConstraints = dstRel;
 
   // Add 'src' happens before 'dst' ordering constraints.
   addOrderingConstraints(srcDomain, dstDomain, loopDepth,
