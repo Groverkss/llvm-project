@@ -1772,32 +1772,37 @@ void FlatAffineConstraints::removeRedundantConstraints() {
 void FlatAffineConstraints::removeRedundantLocalVars() {
   normalizeConstraintsByGCD();
 
-  for (int64_t i = 0; i < getNumEqualities(); ++i) {
-    bool foundOne = false;
-    unsigned eliminateVar;
-    for (unsigned j = getNumDimAndSymbolIds(), f = getNumIds(); j < f; ++j) {
-      if (std::abs(atEq(i, j)) == 1) {
-        foundOne = true;
-        eliminateVar = j;
-        break;
+  bool change = true;
+  while(change) {
+    change = false;
+    for (int64_t i = 0; i < getNumEqualities(); ++i) {
+      bool foundOne = false;
+      unsigned eliminateVar;
+      for (unsigned j = getNumDimAndSymbolIds(), f = getNumIds(); j < f; ++j) {
+        if (std::abs(atEq(i, j)) == 1) {
+          foundOne = true;
+          eliminateVar = j;
+          break;
+        }
       }
+
+      if (!foundOne)
+        continue;
+
+      change = true;
+      // Use equality to simplify other constraints
+      for (unsigned j = 0, f = getNumEqualities(); j < f; ++j)
+        eliminateFromConstraint(this, j, i, eliminateVar, eliminateVar,
+            /*isEq=*/true);
+      for (unsigned j = 0, f = getNumInequalities(); j < f; ++j)
+        eliminateFromConstraint(this, j, i, eliminateVar, eliminateVar,
+            /*isEq=*/false);
+      normalizeConstraintsByGCD();
+      removeId(eliminateVar);
+      removeEquality(i);
+      --i;
+      break;
     }
-
-    if (!foundOne)
-      continue;
-
-    // Use equality to simplify other constraints
-    for (unsigned j = 0, f = getNumEqualities(); j < f; ++j)
-      eliminateFromConstraint(this, j, i, eliminateVar, eliminateVar,
-                              /*isEq=*/true);
-    for (unsigned j = 0, f = getNumInequalities(); j < f; ++j)
-      eliminateFromConstraint(this, j, i, eliminateVar, eliminateVar,
-                              /*isEq=*/false);
-    normalizeConstraintsByGCD();
-    removeId(eliminateVar);
-    removeEquality(i);
-    --i;
-    break;
   }
 }
 
@@ -3520,6 +3525,8 @@ FlatAffineValueConstraints FlatAffineRelation::getDomainSet() const {
   domain.convertDimToLocal(
       getNumDomainDims(), getNumDomainDims() + getNumRangeDims());
 
+  domain.removeRedundantLocalVars();
+
   return domain;
 }
 
@@ -3529,6 +3536,8 @@ FlatAffineValueConstraints FlatAffineRelation::getRangeSet() const {
 
   // Convert all domain variables to local variables
   range.convertDimToLocal(0, getNumDomainDims());
+
+  range.removeRedundantLocalVars();
 
   return range;
 }
