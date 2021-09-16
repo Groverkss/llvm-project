@@ -439,14 +439,15 @@ static void computeDirectionVector(
   }
 }
 
-// TODO: Add docs
+/// Add local variables and their constraints contained in `cst` obtained by
+/// flattening accessValueMap to accessRel. The newly added local variables are
+/// added at the end. Returns the offset from which new ids were added.
 static unsigned addAccessLocalVars(FlatAffineRelation &accessRel,
                                    const AffineValueMap &accessValueMap,
                                    FlatAffineValueConstraints &cst) {
   // Set Values in cst
   for (unsigned i = 0, e = accessValueMap.getNumOperands(); i < e; ++i)
     cst.setValue(i, accessValueMap.getOperand(i));
-
   // Add local variables to accessRel
   unsigned localOffset = accessRel.getNumIds();
   accessRel.appendLocalId(cst.getNumLocalIds());
@@ -454,7 +455,6 @@ static unsigned addAccessLocalVars(FlatAffineRelation &accessRel,
   // Add inequalities from cst to accessRel
   for (unsigned i = 0, e = cst.getNumInequalities(); i < e; ++i) {
     SmallVector<int64_t, 8> newIneq(accessRel.getNumCols(), 0);
-
     // Set identifier coefficients
     for (unsigned j = 0, e = cst.getNumDimAndSymbolIds(); j < e; ++j) {
       unsigned operandPos;
@@ -467,17 +467,18 @@ static unsigned addAccessLocalVars(FlatAffineRelation &accessRel,
       newIneq[localOffset + j] = cst.atIneq(i, cst.getNumDimAndSymbolIds() + j);
     // Set constant term.
     newIneq[newIneq.size() - 1] = cst.atIneq(i, cst.getNumCols() - 1);
-
     accessRel.addInequality(newIneq);
   }
 
   return localOffset;
 }
 
-FlatAffineRelation MemRefAccess::getAccessRelation() const {
+LogicalResult
+MemRefAccess::getAccessRelation(FlatAffineRelation &ret) const {
   // Create domain of access
   FlatAffineValueConstraints domain;
-  getOpIndexSet(opInst, &domain);
+  if (failed(getOpIndexSet(opInst, &domain)))
+    return failure();
 
   // Create range of access
   AffineValueMap accessValueMap;
@@ -491,31 +492,28 @@ FlatAffineRelation MemRefAccess::getAccessRelation() const {
   // Build access relation
   // accessRel: empty -> range
   // domainRel: domain -> empty
-  // accessRel `compose` rangeRel: domain -> range
+  // accessRel compose rangeRel: domain -> range
   FlatAffineRelation accessRel(0, range.getNumDimIds(), range);
   FlatAffineRelation domainRel(domain.getNumDimIds(), 0, domain);
-
   accessRel.compose(domainRel);
 
   // Get flattened expressions
   std::vector<SmallVector<int64_t, 8>> flatExprs;
   FlatAffineValueConstraints localVarCst;
-  getFlattenedAffineExprs(accessValueMap.getAffineMap(), &flatExprs,
-                          &localVarCst);
+  if (failed(getFlattenedAffineExprs(accessValueMap.getAffineMap(), &flatExprs,
+                                     &localVarCst)))
+    return failure();
 
   // Add local ids from access map to accessRelation
   unsigned newLocalIdOffset =
       addAccessLocalVars(accessRel, accessValueMap, localVarCst);
 
-  // Get access map operands
-  ArrayRef<Value> operands = accessValueMap.getOperands();
-
   // Add access constraints to relation as equalities
+  ArrayRef<Value> operands = accessValueMap.getOperands();
   SmallVector<int64_t, 8> eq(accessRel.getNumCols());
   for (unsigned i = 0, e = accessValueMap.getNumResults(); i < e; ++i) {
     // Zero fill.
     std::fill(eq.begin(), eq.end(), 0);
-
     // Flattened AffineExpr for i^th range result.
     const auto &flatExpr = flatExprs[i];
     // Set identifier coefficients from access map
@@ -531,14 +529,12 @@ FlatAffineRelation MemRefAccess::getAccessRelation() const {
           flatExpr[localVarCst.getNumDimAndSymbolIds() + j];
     // Set constant term.
     eq[eq.size() - 1] = flatExpr[flatExpr.size() - 1];
-
     // Set this to the i^th range identifier
     eq[accessRel.getNumDomainDims() + i] = -1;
-
     accessRel.addEquality(eq);
   }
-
-  return accessRel;
+  ret = accessRel;
+  return success();
 }
 
 // Populates 'accessMap' with composition of AffineApplyOps reachable from
@@ -569,17 +565,15 @@ void MemRefAccess::getAccessMap(AffineValueMap *accessMap) const {
 // common to both accesses (see Dependence in AffineAnalysis.h for details).
 //
 // The memref access dependence check is comprised of the following steps:
-// *) Compute access functions for each access. Access functions are computed
-//    using AffineValueMaps initialized with the indices from an access, then
-//    composed with AffineApplyOps reachable from operands of that access,
-//    until operands of the AffineValueMap are loop IVs or symbols.
-// *) Build iteration domain constraints for each access. Iteration domain
-//    constraints are pairs of inequality constraints representing the
-//    upper/lower loop bounds for each AffineForOp in the loop nest associated
-//    with each access.
-// *) Build dimension and symbol position maps for each access, which map
-//    Values from access functions and iteration domains to their position
-//    in the merged constraint system built by this method.
+// *) Build access relation for each access. An access relation maps elements
+//    of an iteration domain to the element(s) of an array domain accessed by
+//    that iteration of the associated statement through some array reference.
+// *) Compute the dependence relation by composing access relation of
+//    `srcAccess` with the inverse of access relation of `dstAccess`.
+//    Doing this builds a relation between iteration domain of `srcAccess`
+//    to the iteration domain of `dstAccess` which access the same memory
+//    location.
+// *) Add ordering constraints for `srcAccess` to be access before `dstAccess`.
 //
 // This method builds a constraint system with the following column format:
 //
@@ -606,34 +600,34 @@ void MemRefAccess::getAccessMap(AffineValueMap *accessMap) const {
 //     }
 //   }
 //
-// The access functions would be the following:
+// The access relation for `srcAccess` would be the following:
 //
-//   src: (%i0 * 2 - %i1 * 4 + %N, %i1 * 3 - %M)
-//   dst: (%i2 * 7 + %i3 * 9 - %M, %i3 * 11 - %K)
+//   [src_dim0, src_dim1, mem_dim0, mem_dim1,  %N,   %M,  const]
+//       2        -4       -1         0         1     0     0     = 0
+//       0         3        0        -1         0    -1     0     = 0
+//       1         0        0         0         0     0     0    >= 0
+//      -1         0        0         0         0     0     100  >= 0
+//       0         1        0         0         0     0     0    >= 0
+//       0        -1        0         0         0     0     50   >= 0
 //
-// The iteration domains for the src/dst accesses would be the following:
+//  The access relation for `dstAccess` would be the following:
 //
-//   src: 0 <= %i0 <= 100, 0 <= %i1 <= 50
-//   dst: 0 <= %i2 <= 100, 0 <= %i3 <= 50
+//   [dst_dim0, dst_dim1, mem_dim0, mem_dim1,  %M,   %K,  const]
+//       7         9       -1         0        -1     0     0     = 0
+//       0         11       0        -1         0    -1     0     = 0 
+//       1         0        0         0         0     0     0    >= 0
+//      -1         0        0         0         0     0     100  >= 0
+//       0         1        0         0         0     0     0    >= 0
+//       0        -1        0         0         0     0     50   >= 0
 //
-// The symbols by both accesses would be assigned to a canonical position order
-// which will be used in the dependence constraint system:
+//  The equalities in the above relations correspond to the access maps while
+//  the inequalities corresspond to the iteration domain constraints.
+// 
+// The dependence relation formed:
 //
-//   symbol name: %M  %N  %K
-//   symbol  pos:  0   1   2
-//
-// Equality constraints are built by equating each result of src/destination
-// access functions. For this example, the following two equality constraints
-// will be added to the dependence constraint system:
-//
-//   [src_dim0, src_dim1, dst_dim0, dst_dim1, sym0, sym1, sym2, const]
-//      2         -4        -7        -9       1      1     0     0    = 0
-//      0          3         0        -11     -1      0     1     0    = 0
-//
-// Inequality constraints from the iteration domain will be meged into
-// the dependence constraint system
-//
-//   [src_dim0, src_dim1, dst_dim0, dst_dim1, sym0, sym1, sym2, const]
+//   [src_dim0, src_dim1, dst_dim0, dst_dim1,  %M,   %N,   %K,  const]
+//      2         -4        -7        -9        1     1     0     0    = 0
+//      0          3         0        -11      -1     0     1     0    = 0
 //       1         0         0         0        0     0     0     0    >= 0
 //      -1         0         0         0        0     0     0     100  >= 0
 //       0         1         0         0        0     0     0     0    >= 0
@@ -664,16 +658,12 @@ DependenceResult mlir::checkMemrefAccessDependence(
       !isa<AffineWriteOpInterface>(dstAccess.opInst))
     return DependenceResult::NoDependence;
 
-  // Get composed access function for 'srcAccess'.
-  AffineValueMap srcAccessMap;
-  srcAccess.getAccessMap(&srcAccessMap);
-
-  // Get composed access function for 'dstAccess'.
-  AffineValueMap dstAccessMap;
-  dstAccess.getAccessMap(&dstAccessMap);
-
-  FlatAffineRelation srcRel = srcAccess.getAccessRelation();
-  FlatAffineRelation dstRel = dstAccess.getAccessRelation();
+  // Create access relations
+  FlatAffineRelation srcRel, dstRel;
+  if (failed(srcAccess.getAccessRelation(srcRel)))
+    return DependenceResult::Failure;
+  if (failed(dstAccess.getAccessRelation(dstRel)))
+    return DependenceResult::Failure;
 
   FlatAffineValueConstraints srcDomain = srcRel.getDomainSet();
   FlatAffineValueConstraints dstDomain = dstRel.getDomainSet();
@@ -691,6 +681,7 @@ DependenceResult mlir::checkMemrefAccessDependence(
     return DependenceResult::NoDependence;
   }
 
+  // Create dependence relation
   dstRel.inverse();
   dstRel.compose(srcRel);
   *dependenceConstraints = dstRel;
@@ -700,15 +691,13 @@ DependenceResult mlir::checkMemrefAccessDependence(
                          dependenceConstraints);
 
   // Return 'NoDependence' if the solution space is empty: no dependence.
-  if (dependenceConstraints->isEmpty()) {
+  if (dependenceConstraints->isEmpty())
     return DependenceResult::NoDependence;
-  }
 
   // Compute dependence direction vector and return true.
-  if (dependenceComponents != nullptr) {
+  if (dependenceComponents != nullptr)
     computeDirectionVector(srcDomain, dstDomain, loopDepth,
                            dependenceConstraints, dependenceComponents);
-  }
 
   LLVM_DEBUG(llvm::dbgs() << "Dependence polyhedron:\n");
   LLVM_DEBUG(dependenceConstraints->dump());
