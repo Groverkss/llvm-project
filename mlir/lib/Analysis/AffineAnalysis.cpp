@@ -473,8 +473,7 @@ static unsigned addAccessLocalVars(FlatAffineRelation &accessRel,
   return localOffset;
 }
 
-LogicalResult
-MemRefAccess::getAccessRelation(FlatAffineRelation &ret) const {
+LogicalResult MemRefAccess::getAccessRelation(FlatAffineRelation &ret) const {
   // Create domain of access
   FlatAffineValueConstraints domain;
   if (failed(getOpIndexSet(opInst, &domain)))
@@ -614,7 +613,7 @@ void MemRefAccess::getAccessMap(AffineValueMap *accessMap) const {
 //
 //   [dst_dim0, dst_dim1, mem_dim0, mem_dim1,  %M,   %K,  const]
 //       7         9       -1         0        -1     0     0     = 0
-//       0         11       0        -1         0    -1     0     = 0 
+//       0         11       0        -1         0    -1     0     = 0
 //       1         0        0         0         0     0     0    >= 0
 //      -1         0        0         0         0     0     100  >= 0
 //       0         1        0         0         0     0     0    >= 0
@@ -622,7 +621,7 @@ void MemRefAccess::getAccessMap(AffineValueMap *accessMap) const {
 //
 //  The equalities in the above relations correspond to the access maps while
 //  the inequalities corresspond to the iteration domain constraints.
-// 
+//
 // The dependence relation formed:
 //
 //   [src_dim0, src_dim1, dst_dim0, dst_dim1,  %M,   %N,   %K,  const]

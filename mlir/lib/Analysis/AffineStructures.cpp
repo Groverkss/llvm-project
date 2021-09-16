@@ -531,21 +531,17 @@ static void turnSymbolIntoDim(FlatAffineValueConstraints *cst, Value id) {
 void FlatAffineValueConstraints::toCommonSymbolSpace(
     FlatAffineValueConstraints &other) {
   SmallVector<Value, 4> aSymValues;
-  getValues(getNumDimIds(), getNumDimAndSymbolIds(),
-                   &aSymValues);
+  getValues(getNumDimIds(), getNumDimAndSymbolIds(), &aSymValues);
 
   // Merge symbols: merge symbols into `other` first from `this`.
   unsigned s = other.getNumDimIds();
   for (auto aSymValue : aSymValues) {
     unsigned loc;
-    if (other.findId(aSymValue, &loc)) {
-      // If the id is a symbol in `other`, then align it, otherwise assume that
-      // it is a new symbol
-      if (loc >= other.getNumDimIds() && loc < getNumDimAndSymbolIds())
-        other.swapId(s, loc);
-      else
-        other.insertSymbolId(s - other.getNumDimIds(), aSymValue);
-    }
+    // If the id is a symbol in `other`, then align it, otherwise assume that
+    // it is a new symbol
+    if (other.findId(aSymValue, &loc) && loc >= other.getNumDimIds() &&
+        loc < getNumDimAndSymbolIds())
+      other.swapId(s, loc);
     else
       other.insertSymbolId(s - other.getNumDimIds(), aSymValue);
     s++;
@@ -3525,8 +3521,8 @@ AffineMap mlir::alignAffineMapWithValues(AffineMap map, ValueRange operands,
 FlatAffineValueConstraints FlatAffineRelation::getDomainSet() const {
   FlatAffineValueConstraints domain = *this;
   // Convert all range variables to local variables
-  domain.convertDimToLocal(
-      getNumDomainDims(), getNumDomainDims() + getNumRangeDims());
+  domain.convertDimToLocal(getNumDomainDims(),
+                           getNumDomainDims() + getNumRangeDims());
   domain.removeRedundantLocalVars();
   return domain;
 }
@@ -3553,7 +3549,7 @@ void FlatAffineRelation::compose(const FlatAffineRelation &other) {
   // Bring `this` and `rel` to common symbol and local space
   toCommonSymbolSpace(rel);
   toCommonLocalSpace(rel);
-  // Convert domain of `this` and range of `rel` to local identifiers. 
+  // Convert domain of `this` and range of `rel` to local identifiers.
   convertDimToLocal(0, getNumDomainDims());
   rel.convertDimToLocal(rel.getNumDomainDims(),
                         rel.getNumDomainDims() + rel.getNumRangeDims());
@@ -3617,8 +3613,7 @@ void FlatAffineRelation::removeIdRange(unsigned idStart, unsigned idLimit) {
 
   // domain and range dimensions to remove are computed by calculating
   // intersection with of removed ids range
-  unsigned domainDimsToRemove =
-      std::min(idLimit, getNumDomainDims()) - idStart;
+  unsigned domainDimsToRemove = std::min(idLimit, getNumDomainDims()) - idStart;
   unsigned rangeDimsToRemove =
       std::min(idLimit, getNumDomainDims() + getNumRangeDims()) -
       std::max(idStart, getNumDomainDims());
