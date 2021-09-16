@@ -488,10 +488,6 @@ FlatAffineRelation MemRefAccess::getAccessRelation() const {
     range.setValue(range.getNumDimIds() + i,
                    accessValueMap.getOperand(i + accessValueMap.getNumDims()));
 
-  // Align domain and range symbols and local variables
-  domain.toCommonSymbolSpace(range);
-  domain.toCommonLocalSpace(range);
-
   // Build access relation
   // accessRel: empty -> range
   // domainRel: domain -> empty
@@ -695,11 +691,8 @@ DependenceResult mlir::checkMemrefAccessDependence(
     return DependenceResult::NoDependence;
   }
 
-  srcRel.toCommonSymbolSpace(dstRel);
-  srcRel.toCommonLocalSpace(dstRel);
   dstRel.inverse();
   dstRel.compose(srcRel);
-
   *dependenceConstraints = dstRel;
 
   // Add 'src' happens before 'dst' ordering constraints.

@@ -416,7 +416,11 @@ public:
   /// O(VC) time.
   void removeRedundantConstraints();
 
-  /// TODO: Write docs
+  /// Removes local variables using equalities. Each equality is checked if it
+  /// can be reduced to the form: `e = affine-expr`, where `e` is a local
+  /// variables and `affine-expr` is an affine expression not containing `e`.
+  /// If an equality satisfies this form, the local variable is replaced in
+  /// each constraint and then removed.
   void removeRedundantLocalVars();
 
   /// Converts identifiers in the column range [idStart, idLimit) to local
@@ -848,7 +852,9 @@ public:
       setValue(i, values[i - start]);
   }
 
-  // TODO: Add docs, asserts for symbols
+  /// Merge and align symbols of `this` and `other` such that both get union of
+  /// of symbols that are unique. Symbols with Value as `None` are considered
+  /// to be inequal to all other symbols.
   void toCommonSymbolSpace(FlatAffineValueConstraints &other);
 
 protected:
@@ -879,8 +885,6 @@ protected:
   SmallVector<Optional<Value>, 8> values;
 };
 
-// TODO: Change addId and removeIdRange to modify numDomainDims and
-// numRangeDims.
 class FlatAffineRelation : public FlatAffineValueConstraints {
 public:
   FlatAffineRelation(unsigned numReservedInequalities,
@@ -909,51 +913,27 @@ public:
       : FlatAffineValueConstraints(fac), numDomainDims(numDomainDims),
         numRangeDims(numRangeDims) {}
 
-  /// Create a FlatAffineValueConstraints object containing the set
-  /// corresponding to domain/range of the relation.
+  /// Returns a set corresponding to the domain/range of the affine relation.
   FlatAffineValueConstraints getDomainSet() const;
   FlatAffineValueConstraints getRangeSet() const;
 
   inline unsigned getNumDomainDims() const { return numDomainDims; }
   inline unsigned getNumRangeDims() const { return numRangeDims; }
 
-  /// If `rel`: `(domainRel -> rangeRel)`
-  /// and `this`: `(domainThis -> rangeRel)`
-  /// Then, result of this operation is composition of `rel` and `this`:
-  /// `rel(this)`: `(domainRel -> rangeThis)`
-  /// 
-  /// The domain of `this` and range of `rel` must match.
+  /// Given affine relations `other: (domainOther -> rangeOther)` and
+  /// `this: (domainThis -> rangeThis)`, this operation takes the composition of
+  /// `other` on `this`: `rel(this): (domainOther -> rangeThis)`
   void compose(const FlatAffineRelation &other);
 
   /// Swap domain and range of the relation
-  /// (domain -> range) converts to (range -> domain)
+  /// (domain -> range) is converted to (range -> domain)
   void inverse();
-
-  static FlatAffineRelation getIdentity(unsigned numDomainDims = 0,
-                                        unsigned numRangeDims = 0,
-                                        unsigned numSymbols = 0) {
-    return FlatAffineRelation(numDomainDims, numRangeDims, numSymbols);
-  }
 
   void appendDomainId(unsigned num = 1);
   void appendRangeId(unsigned num = 1);
 
-  void dumpRel() const;
-
 protected:
   unsigned numDomainDims, numRangeDims;
-
-  /// Insert identifiers of the specified kind at position `pos`. Positions are
-  /// relative to the kind of identifier. The coefficient columns corresponding
-  /// to the added identifiers are initialized to zero. `vals` are the Values
-  /// corresponding to the identifiers. Return the absolute column position
-  /// (i.e., not relative to the kind of identifier) of the first added
-  /// identifier.
-  ///
-  /// Note: Empty Values are allowed in `vals`.
-  ///
-  /// For IdKind::Dimension, ids added 
-  /* unsigned insertId(IdKind kind, unsigned pos, unsigned num = 1) override; */
 
   /// Removes identifiers in the column range [idStart, idLimit), and copies any
   /// remaining valid data into place, updates member variables, and resizes
