@@ -885,6 +885,8 @@ protected:
   SmallVector<Optional<Value>, 8> values;
 };
 
+/// A FlatAffineRelation represents a set of ordered pairs (domain -> range)
+/// where "domain" and "range" are tuples of identifiers.
 class FlatAffineRelation : public FlatAffineValueConstraints {
 public:
   FlatAffineRelation(unsigned numReservedInequalities,
