@@ -225,9 +225,6 @@ func @should_fuse_live_out_writer(%arg0 : memref<10xf32>) -> memref<10xf32> {
 
 // The fused slice has 16 iterations from along %i0.
 
-// CHECK-DAG: [[$MAP_LB:#map[0-9]+]] = affine_map<(d0) -> (d0 * 16)>
-// CHECK-DAG: [[$MAP_UB:#map[0-9]+]] = affine_map<(d0) -> (d0 * 16 + 16)>
-
 // CHECK-LABEL: slice_tile
 func @slice_tile(%arg0: memref<128x8xf32>, %arg1: memref<32x8xf32>, %0 : f32) -> memref<32x8xf32> {
   affine.for %i0 = 0 to 32 {
@@ -252,9 +249,9 @@ func @slice_tile(%arg0: memref<128x8xf32>, %arg1: memref<32x8xf32>, %0 : f32) ->
   }
   return %arg1 : memref<32x8xf32>
 }
-// CHECK:       affine.for %{{.*}} = 0 to 2 {
-// CHECK-NEXT:    affine.for %{{.*}} = 0 to 8 {
-// CHECK-NEXT:      affine.for %{{.*}} = [[$MAP_LB]](%{{.*}}) to [[$MAP_UB]](%{{.*}}) {
+// CHECK:       affine.for %{{.*}} = 0 to 8 {
+// CHECK-NEXT:    affine.for %{{.*}} = 0 to 2 {
+// CHECK-NEXT:      affine.for %{{.*}} = 0 to 32 {
 // CHECK-NEXT:        affine.store %{{.*}}, %{{.*}}[%{{.*}}, %{{.*}}] : memref<32x8xf32>
 // CHECK-NEXT:      }
 // CHECK-NEXT:      affine.for %{{.*}} = 0 to 8 {
