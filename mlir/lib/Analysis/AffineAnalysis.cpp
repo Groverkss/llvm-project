@@ -428,7 +428,7 @@ LogicalResult MemRefAccess::getAccessRelation(FlatAffineRelation &ret) const {
   // of the access map is a subset of the domain of access, the domain ids of
   // `ret` are guranteed to be a subset of ids of `domain`.
   for (unsigned i = 0, e = domain.getNumDimIds(); i < e; ++i) {
-    unsigned loc; 
+    unsigned loc;
     if (ret.findId(domain.getValue(i), &loc))
       ret.swapId(i, loc);
     else {

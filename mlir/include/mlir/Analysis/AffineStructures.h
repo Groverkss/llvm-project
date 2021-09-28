@@ -904,8 +904,8 @@ protected:
 
 /// A FlatAffineRelation represents a set of ordered pairs (domain -> range)
 /// where "domain" and "range" are tuples of identifiers. The relation is
-/// represented as a FlatAffineValueConstraints with seperation of dimension
-/// identifiers into domain and  range. The identifiers are stored as: 
+/// represented as a FlatAffineValueConstraints with separation of dimension
+/// identifiers into domain and  range. The identifiers are stored as:
 /// [domainIds, rangeIds, symbolIds, localIds, constant].
 class FlatAffineRelation : public FlatAffineValueConstraints {
 public:
@@ -939,6 +939,8 @@ public:
   FlatAffineValueConstraints getDomainSet() const;
   FlatAffineValueConstraints getRangeSet() const;
 
+  /// Returns the number of identifiers corresponding to domain/range of
+  /// relation.
   inline unsigned getNumDomainDims() const { return numDomainDims; }
   inline unsigned getNumRangeDims() const { return numRangeDims; }
 

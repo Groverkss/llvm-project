@@ -1853,8 +1853,7 @@ void FlatAffineConstraints::removeRedundantLocalVars() {
 
 void FlatAffineConstraints::convertDimToLocal(unsigned dimStart,
                                               unsigned dimLimit) {
-  assert(dimStart >= 0 && dimLimit <= getNumDimIds() &&
-         "Invalid dim pos range");
+  assert(dimLimit <= getNumDimIds() && "Invalid dim pos range");
 
   if (dimStart >= dimLimit)
     return;
@@ -2092,6 +2091,7 @@ void FlatAffineConstraints::getSliceBounds(unsigned offset, unsigned num,
           // redundant loop bounds.
           tmpClone->removeRedundantInequalities();
         }
+        tmpClone->dump();
         std::tie(lbMap, ubMap) = tmpClone->getLowerAndUpperBound(
             pos, offset, num, getNumDimIds(), /*localExprs=*/{}, context);
       }
@@ -3661,8 +3661,8 @@ void FlatAffineRelation::removeIdRange(unsigned idStart, unsigned idLimit) {
 
   FlatAffineValueConstraints::removeIdRange(idStart, idLimit);
 
-  // domain and range dimensions to remove are computed by calculating
-  // intersection with of removed ids range.
+  // Compute number of domain and range identifiers to remove. This is done by
+  // intersecting the range of domain/range ids with range of ids to remove.
   unsigned intersectDomainLHS = std::min(idLimit, getNumDomainDims());
   unsigned intersectDomainRHS = idStart;
   unsigned intersectRangeLHS = std::min(idLimit, getNumDimAndSymbolIds());

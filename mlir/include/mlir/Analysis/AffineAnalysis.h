@@ -25,8 +25,8 @@ namespace mlir {
 class AffineApplyOp;
 class AffineForOp;
 class AffineValueMap;
-class FlatAffineValueConstraints;
 class FlatAffineRelation;
+class FlatAffineValueConstraints;
 class Operation;
 
 /// A description of a (parallelizable) reduction in an affine loop.
@@ -106,7 +106,8 @@ struct MemRefAccess {
   ///   0  <= %i0 < 10
   ///   0  <= %i1 < 10
   ///
-  /// Returns failure if the access relation could not be created.
+  /// Returns failure for yet unimplemented/unsupported cases (see docs of
+  /// mlir::getIndexSet and mlir::getRelationFromMap for these cases).
   LogicalResult getAccessRelation(FlatAffineRelation &accessRel) const;
 
   /// Populates 'accessMap' with composition of AffineApplyOps reachable from
