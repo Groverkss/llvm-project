@@ -3611,9 +3611,11 @@ void FlatAffineRelation::compose(const FlatAffineRelation &other) {
       rel.setValue(rangeIdx, thisMaybeValues[rangeIdx].getValue());
   }
 
-  // Append `rel` to `this` and simplify constraints.
-  append(rel);
-  removeRedundantLocalVars();
+  // Append `this` to `rel` and simplify constraints.
+  rel.append(*this);
+  rel.removeRedundantLocalVars();
+
+  *this = rel;
 }
 
 void FlatAffineRelation::inverse() {
