@@ -100,14 +100,7 @@ static void checkDependences(ArrayRef<Operation *> loadsAndStores) {
 // Walks the Function 'f' adding load and store ops to 'loadsAndStores'.
 // Runs pair-wise dependence checks.
 void TestMemRefDependenceCheck::runOnFunction() {
-  // Collect the loads and stores within the function.
-  loadsAndStores.clear();
-  getFunction().walk([&](Operation *op) {
-    if (isa<AffineLoadOp, AffineStoreOp>(op))
-      loadsAndStores.push_back(op);
-  });
-
-  checkDependences(loadsAndStores);
+  doValueBasedDepAnalysis(getFunction());
 }
 
 namespace mlir {

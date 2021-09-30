@@ -69,14 +69,14 @@ TransprecSet getTransprecSetFromString(StringRef str) {
   // std::cerr << "Read '" << str << "'\n";
   if (auto set = setFromString<SafeInteger<int16_t>>(str))
     return TransprecSet(*set);
-  else if (auto set = setFromString<SafeInteger<int64_t>>(str))
+  if (auto set = setFromString<SafeInteger<int64_t>>(str))
     return TransprecSet(*set);
-  else if (auto set = setFromString<SafeInteger<__int128_t>>(str))
+  if (auto set = setFromString<SafeInteger<__int128_t>>(str))
     return TransprecSet(*set);
-  else if (auto set = setFromString<mpz_class>(str))
+  if (auto set = setFromString<mpz_class>(str))
     return TransprecSet(*set);
-  else
-    llvm_unreachable("Input did not fit in 128-bits!");
+  
+  llvm_unreachable("Input did not fit in 128-bits!");
 }
 
 template <typename Set>
@@ -86,10 +86,9 @@ Set getSetFromInput() {
   if constexpr (std::is_same_v<Set, TransprecSet>) {
     return getTransprecSetFromString(str);
   } else {
-    if (auto set = setFromString<typename Set::UnderlyingInt>(str)) {
+    if (auto set = setFromString<typename Set::UnderlyingInt>(str))
       return *set;
-    } else
-      llvm_unreachable("Input did not fit in specified precision!");
+    llvm_unreachable("Input did not fit in specified precision!");
   }
 }
 

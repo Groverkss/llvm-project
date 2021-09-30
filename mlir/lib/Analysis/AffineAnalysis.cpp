@@ -591,8 +591,8 @@ static void addOrderingConstraints(const FlatAffineConstraints &srcDomain,
   unsigned numCommonLoopConstraints = std::min(numCommonLoops, loopDepth);
   for (unsigned i = 0; i < numCommonLoopConstraints; ++i) {
     std::fill(eq.begin(), eq.end(), 0);
-    eq[offset + i] = -1;
-    eq[offset + i + numSrcDims] = 1;
+    eq[offset + i] = 1;
+    eq[offset + i + numSrcDims] = -1;
     if (i == loopDepth - 1) {
       eq[numCols - 1] = -1;
       dependenceDomain->addInequality(eq);
@@ -1100,13 +1100,6 @@ static void killDep(unsigned sourceIdx, PresburgerMap<int64_t> &depMap,
 static void killAnalysisSink(MemRefAccess sink,
                              SmallVector<MemRefAccess, 8> sources) {
 
-  for (int i = 0; i < (int)sources.size(); ++i) {
-    if (sink.memref != sources[i].memref) {
-      sources.erase(sources.begin() + i);
-      i--;
-    }
-  }
-
   // Build access map for sink
   AffineValueMap sinkAccessMap;
   sink.getAccessMap(&sinkAccessMap);
@@ -1192,8 +1185,10 @@ static void killAnalysisSink(MemRefAccess sink,
       sources[i].opInst->dump(); // DEBUG
       llvm::errs() << "\n\n";
 
-      for (auto &bs: finalDeps[i])
+      for (auto &bs: finalDeps[i]) {
+        bs.simplify();
         bs.dump();
+      }
 
       llvm::errs() << "\n\n";
   }
@@ -1211,13 +1206,11 @@ void mlir::doValueBasedDepAnalysis(FuncOp f) {
   // Collect all load and store ops in loop nest rooted at 'forOp'.
   SmallVector<MemRefAccess, 8> sinks, sources;
   f.walk([&](Operation *op) -> WalkResult {
-      if (isa<AffineReadOpInterface>(op)) {
-        MemRefAccess sink(op);
-        sinks.push_back(sink);
-      } else if (isa<AffineWriteOpInterface>(op)) {
-        MemRefAccess source(op);
-        sources.push_back(source);
-      }
+    if (isa<AffineReadOpInterface>(op) || isa<AffineWriteOpInterface>(op)) {
+      MemRefAccess access(op);
+      sources.push_back(access);
+      sinks.push_back(access);
+    }
     return WalkResult::advance();
   });
 

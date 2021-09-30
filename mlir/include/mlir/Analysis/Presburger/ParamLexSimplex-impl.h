@@ -273,7 +273,7 @@ template <typename Int>
 void ParamLexSimplex<Int>::findParamLexminRecursively(Simplex<Int> &domainSimplex,
                                                  PresburgerBasicSet<Int> &domainSet,
                                                  pwaFunction<Int> &result) {
-  // dump();
+  // this->dump();
   // domainSet.dump();
   // llvm::errs() << "nParam = " << nParam << '\n';
   if (empty || domainSimplex.isEmpty())
@@ -482,7 +482,6 @@ void ParamLexSimplex<Int>::findParamLexminRecursively(Simplex<Int> &domainSimple
     }
 
     unsigned row = var[i].pos;
-    assert(tableau(row, 2) <= 1); // M + x = kM + ...; x = (k-1)M + ...; k-1<=0
     if (tableau(row, 2) <= 0) {
       // lexmin is unbounded; we push an empty entry for this lexmin.
       lexmin.clear();

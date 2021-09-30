@@ -62,7 +62,7 @@ public:
   template <typename OInt>
   friend class PresburgerSet;
 
-private:
+protected:
   unsigned nDim;
   unsigned nSym;
   SmallVector<PresburgerBasicSet<Int>, 4> basicSets;

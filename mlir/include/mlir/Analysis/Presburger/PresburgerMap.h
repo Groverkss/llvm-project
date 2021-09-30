@@ -35,7 +35,6 @@ public:
   /// Range set is created by converting all domain variables to existentials
   PresburgerSet<Int> getRangeSet() const;
 
-  /// Domain set is created by converting all range variables to existentials
   PresburgerSet<Int> getDomainSet() const;
 
   void lexMinRange();
@@ -48,7 +47,8 @@ public:
 private:
   unsigned domainDim, rangeDim;
 
-  SmallVector<Int, 8> convertToRequiredForm(ArrayRef<Int> coeffs);
+  SmallVector<Int, 8> convertToRequiredForm(ArrayRef<Int> coeffs,
+                                            const PresburgerBasicSet<Int> &bs);
 };
 
 } // namespace presburger

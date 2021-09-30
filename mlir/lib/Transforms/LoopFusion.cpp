@@ -1996,6 +1996,15 @@ public:
 } // end anonymous namespace
 
 void LoopFusion::runOnFunction() {
-  FuncOp f = getFunction();
-  doValueBasedDepAnalysis(f);
+  MemRefDependenceGraph g;
+  if (!g.init(getFunction()))
+    return;
+
+  Optional<unsigned> fastMemorySpaceOpt;
+  if (fastMemorySpace.hasValue())
+    fastMemorySpaceOpt = fastMemorySpace;
+  unsigned localBufSizeThresholdBytes = localBufSizeThreshold * 1024;
+  GreedyFusion fusion(&g, localBufSizeThresholdBytes, fastMemorySpaceOpt,
+                      maximalFusion, computeToleranceThreshold);
+  fusion.run();
 }

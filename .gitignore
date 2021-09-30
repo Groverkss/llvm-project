@@ -54,6 +54,7 @@ autoconf/autom4te.cache
 .vscode
 .vs
 # clangd index
+.cache
 .clangd
 # static analyzer regression testing project files
 /clang/utils/analyzer/projects/*/CachedSource

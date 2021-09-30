@@ -753,7 +753,7 @@ unsigned PresburgerBasicSet<Int>::getDivOffset() {
 }
 
 template <typename Int>
-unsigned PresburgerBasicSet<Int>::getExistOffset() {
+unsigned PresburgerBasicSet<Int>::getExistOffset() const {
   return nParam + nDim;
 }
 
@@ -1068,8 +1068,8 @@ bool coeffDependsOnExist(Constraint<Int> &con, unsigned exist,
 
 template <typename Int>
 void PresburgerBasicSet<Int>::recoverDivisionsFromInequalities() {
-  for (unsigned k = 0; k < ineqs.size(); ++k) {
-    for (unsigned l = k + 1; l < ineqs.size(); ++l) {
+  for (int k = 0; k < (int)ineqs.size(); ++k) {
+    for (int l = k + 1; l < (int)ineqs.size(); ++l) {
       const ArrayRef<Int> &coeffs1 = ineqs[k].getCoeffs();
       const ArrayRef<Int> &coeffs2 = ineqs[l].getCoeffs();
 
@@ -1131,11 +1131,6 @@ void PresburgerBasicSet<Int>::recoverDivisionsFromInequalities() {
         else
           newCoeffs = createDivFromLowerBound(coeffs2, existIdx);
 
-        if (constantSum - 1 == std::abs(coeffs1[existIdx])) {
-          removeInequality(l);
-          removeInequality(k);
-        }
-
         // Insert the new division at starting of divs
         DivisionConstraint<Int> newDiv(newCoeffs, std::abs(coeffs1[existIdx]),
                                   getDivOffset() - 1);
@@ -1150,12 +1145,9 @@ void PresburgerBasicSet<Int>::recoverDivisionsFromInequalities() {
         for (auto &con : divs)
           con.swapCoeffs(exist + existOffset, existOffset + nExist - 1);
 
-        // Try using these two inequalities again for some other existential
-        l--;
-
         // Reduce number of existentials and repeat again
         nExist--;
-        continue;;
+        break;
 
         // TODO: One of these inequalities is not needed after finding this.
         //       Remove it.

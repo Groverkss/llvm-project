@@ -40,13 +40,15 @@ inline void expectEqual(StringRef sDesc, StringRef tDesc) {
 }
 
 TEST(PresburgerSet, codeLexMaxTest) {
-  PresburgerSet set = setFromString("(k, i, j)[n, m] : (0 <= i and i <= m and "
-                                    "0 <= j and j <= n and 2i + j = k)");
-  PresburgerMap<Int> map(1, 2, 2);
+  PresburgerSet set = setFromString(
+      "(d0, d1) : (exists e0 : d0 - e0 = 0 and d0 >= 0 and -d0 + 1 >= 0 and d1 "
+      ">= 0 and -d1 + 3 >= 0 and d1 - 2e0 >= 0 and -d1 + 2e0 + 1 >= 0)");
+  PresburgerMap<Int> map(1, 1, 0);
 
   for (const auto &bs: set.getBasicSets())
     map.addBasicSet(bs);
 
+  map.simplify();
   map.dump();
 
   map.lexMaxRange();

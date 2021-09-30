@@ -147,7 +147,7 @@ public:
   template <typename OInt>
   friend class PresburgerBasicSet;
 
-private:
+protected:
   void substitute(ArrayRef<Int> values);
 
   /// Find a sample point in this basic set, when it is known that this basic
@@ -236,7 +236,7 @@ private:
   unsigned getDivOffset();
 
   /// Get the index of first existential variable.
-  unsigned getExistOffset();
+  unsigned getExistOffset() const;
 
   Matrix<Int> coefficientMatrixFromEqs() const;
 

@@ -526,13 +526,12 @@ llvm::hash_code PresburgerSet<Int>::hash_value() const {
 
 template <typename Int>
 void PresburgerSet<Int>::simplify(bool aggressive, bool coalesce) {
-
-  if (coalesce)
-    *this = mlir::coalesce(*this);
-
   for (auto &set : basicSets) {
     set.simplify(aggressive);
   }
+
+  if (coalesce)
+    *this = mlir::coalesce(*this);
 }
 
 #endif // MLIR_ANALYSIS_PRESBURGER_SET_IMPL_H

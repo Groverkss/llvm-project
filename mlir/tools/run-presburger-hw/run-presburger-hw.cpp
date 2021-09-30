@@ -15,7 +15,7 @@ using namespace mlir::presburger;
 unsigned TransprecSet::waterline = 0;
 
 template <typename Int>
-Optional<PresburgerSet<SafeInt<Int>>> setFromString(StringRef string) {
+Optional<PresburgerSet<Int>> setFromString(StringRef string) {
   ErrorCallback callback = [&](SMLoc loc, const Twine &message) {
     // This is a hack to make the Parser compile
     // These have to be commented out currently because "errors" are raised
@@ -35,7 +35,7 @@ Optional<PresburgerSet<SafeInt<Int>>> setFromString(StringRef string) {
   };
   Parser<Int> parser(string, callback);
   PresburgerParser<Int> setParser(parser);
-  PresburgerSet<SafeInt<Int>> res;
+  PresburgerSet<Int> res;
   if (failed(setParser.parsePresburgerSet(res)))
     return {};
   return res;
@@ -54,17 +54,16 @@ TransprecSet getSetFromInput() {
   char str[1'000'000];
   std::cin.getline(str, 1'000'000);
   // std::cerr << "Read '" << str << "'\n";
-  if (auto set = setFromString<int16_t>(str))
+  if (auto set = setFromString<SafeInteger<int16_t>>(str))
     return TransprecSet(*set);
-  else if (auto set = setFromString<int64_t>(str))
+  if (auto set = setFromString<SafeInteger<int64_t>>(str))
     return TransprecSet(*set);
-  else if (auto set = setFromString<__int128_t>(str))
+  if (auto set = setFromString<SafeInteger<__int128_t>>(str))
     return TransprecSet(*set);
-  else if (auto set = setFromString<mpz_class>(str))
+  if (auto set = setFromString<mpz_class>(str))
     return TransprecSet(*set);
-  else
-    llvm_unreachable("Input did not fit in 128-bits!");
-  // return setFromString(str);
+  
+  llvm_unreachable("Input did not fit in 128-bits!");
 }
 
 void consumeNewline() {

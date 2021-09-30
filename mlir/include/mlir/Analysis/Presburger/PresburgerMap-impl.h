@@ -63,19 +63,20 @@ PresburgerSet<Int> PresburgerMap<Int>::getDomainSet() const {
 
 template <typename Int>
 SmallVector<Int, 8>
-PresburgerMap<Int>::convertToRequiredForm(ArrayRef<Int> coeffs) {
+PresburgerMap<Int>::convertToRequiredForm(ArrayRef<Int> coeffs,
+                                          const PresburgerBasicSet<Int> &bs) {
   SmallVector<Int, 8> newCoeffs;
 
   // Add domain elements
   for (unsigned i = 0; i < getDomainDims(); ++i)
     newCoeffs.push_back(coeffs[i]);
 
-  // Add remaining variables
-  for (unsigned i = this->getNumDims(); i < coeffs.size() - 1; ++i)
+  // Add symbols, existentials and divisions
+  for (unsigned i = this->getNumDims(); i < bs.getNumTotalDims(); ++i)
     newCoeffs.push_back(coeffs[i]);
 
-  // Add range elements
-  for (unsigned i = getDomainDims(); i < this->getNumDims(); ++i)
+  // Add range
+  for (unsigned i = getDomainDims(); i < bs.getNumDims(); ++i)
     newCoeffs.push_back(coeffs[i]);
 
   // Add constant
@@ -94,14 +95,15 @@ void PresburgerMap<Int>::lexMinRange() {
       // The division variables must be in the same order they are stored in the
       // basic set.
       paramLexSimplex.addInequality(
-          convertToRequiredForm(div.getInequalityLowerBound().getCoeffs()));
+          convertToRequiredForm(div.getInequalityLowerBound().getCoeffs(), bs));
       paramLexSimplex.addInequality(
-          convertToRequiredForm(div.getInequalityUpperBound().getCoeffs()));
+          convertToRequiredForm(div.getInequalityUpperBound().getCoeffs(), bs));
     }
     for (const auto &ineq : bs.getInequalities())
-      paramLexSimplex.addInequality(convertToRequiredForm(ineq.getCoeffs()));
+      paramLexSimplex.addInequality(
+          convertToRequiredForm(ineq.getCoeffs(), bs));
     for (const auto &eq : bs.getEqualities())
-      paramLexSimplex.addEquality(convertToRequiredForm(eq.getCoeffs()));
+      paramLexSimplex.addEquality(convertToRequiredForm(eq.getCoeffs(), bs));
 
     pwaFunction<Int> pwa = paramLexSimplex.findParamLexmin();
 
@@ -109,7 +111,6 @@ void PresburgerMap<Int>::lexMinRange() {
       auto &bsdom = pwa.domain[i];
       auto &rangeVars = pwa.value[i];
 
-      // Move the non domain variables to be existentials and symbols
       bsdom.nExist = bsdom.getNumDims() - getDomainDims() - this->getNumSyms();
       bsdom.nDim = getDomainDims();
       bsdom.nParam = this->getNumSyms();
@@ -117,7 +118,7 @@ void PresburgerMap<Int>::lexMinRange() {
       bsdom.insertDimensions(getDomainDims(), getRangeDims());
       bsdom.nDim += getRangeDims();
 
-      for (unsigned var = 0; var < rangeVars.size(); ++var) {
+      for (unsigned var = 0; var < getRangeDims(); ++var) {
         EqualityConstraint<Int> eq(rangeVars[var]);   
         eq.insertDimensions(getDomainDims(), getRangeDims());
         eq.setCoeff(getDomainDims() + var, -1);
