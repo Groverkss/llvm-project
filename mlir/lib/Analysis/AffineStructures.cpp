@@ -450,9 +450,11 @@ bool FlatAffineValueConstraints::areIdsAlignedWithOther(
 
 /// Checks if the SSA values associated with `cst`'s identifiers are unique.
 static bool LLVM_ATTRIBUTE_UNUSED
-areIdsUnique(const FlatAffineValueConstraints &cst) {
+areIdsUnique(const FlatAffineValueConstraints &cst, unsigned offset = 0) {
   SmallPtrSet<Value, 8> uniqueIds;
-  for (auto val : cst.getMaybeValues()) {
+  ArrayRef<Optional<Value>> maybeValues = cst.getMaybeValues();
+  for (unsigned i = offset, e = maybeValues.size(); i < e; ++i) {
+    Optional<Value> val = maybeValues[i];
     if (val.hasValue() && !uniqueIds.insert(val.getValue()).second)
       return false;
   }
@@ -592,10 +594,18 @@ static void turnSymbolIntoDim(FlatAffineValueConstraints *cst, Value id) {
 }
 
 /// Merge and align symbols of `this` and `other` such that both get union of
-/// of symbols that are unique. Symbols with Value as `None` are considered
-/// to be inequal to all other symbols.
+/// of symbols that are unique. Symbols in `this` and `other` should be
+/// unique. Symbols with Value as `None` are considered to be inequal to all
+/// other symbols.
 void FlatAffineValueConstraints::mergeSymbolIds(
     FlatAffineValueConstraints &other) {
+
+  assert(areIdsUnique(*this, /*offset=*/getIdKindOffset(IdKind::Symbol)) &&
+         "Symbol ids are not unique");
+  assert(
+      areIdsUnique(other, /*offset=*/other.getIdKindOffset(IdKind::Symbol)) &&
+      "Symbol ids not unique");
+
   SmallVector<Value, 4> aSymValues;
   getValues(getNumDimIds(), getNumDimAndSymbolIds(), &aSymValues);
 
@@ -606,7 +616,7 @@ void FlatAffineValueConstraints::mergeSymbolIds(
     // If the id is a symbol in `other`, then align it, otherwise assume that
     // it is a new symbol
     if (other.findId(aSymValue, &loc) && loc >= other.getNumDimIds() &&
-        loc < getNumDimAndSymbolIds())
+        loc < other.getNumDimAndSymbolIds())
       other.swapId(s, loc);
     else
       other.insertSymbolId(s - other.getNumDimIds(), aSymValue);
@@ -621,6 +631,11 @@ void FlatAffineValueConstraints::mergeSymbolIds(
 
   assert(getNumSymbolIds() == other.getNumSymbolIds() &&
          "expected same number of symbols");
+  assert(areIdsUnique(*this, /*offset=*/getIdKindOffset(IdKind::Symbol)) &&
+         "Symbol ids are not unique");
+  assert(
+      areIdsUnique(other, /*offset=*/other.getIdKindOffset(IdKind::Symbol)) &&
+      "Symbol ids are not unique");
 }
 
 // Changes all symbol identifiers which are loop IVs to dim identifiers.
