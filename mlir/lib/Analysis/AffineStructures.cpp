@@ -1972,8 +1972,8 @@ void FlatAffineConstraints::mergeDivisions(FlatAffineConstraints &other) {
     for (unsigned i = fac.getIdKindOffset(IdKind::Local), e = fac.getNumIds();
          i < e; ++i)
       if (div[i] != 0)
-        return false;
-    return true;
+        return true;
+    return false;
   };
 
   unsigned offset = fac2.getIdKindOffset(IdKind::Local);
@@ -1997,6 +1997,7 @@ void FlatAffineConstraints::mergeDivisions(FlatAffineConstraints &other) {
       // Match found, merge divisions.
       fac2.swapId(i + offset, j + offset);
       std::swap(divs2[i], divs2[j]);
+      std::swap(denoms2[i], denoms2[j]);
 
       break;
     }
