@@ -435,6 +435,8 @@ public:
   /// of its local ids.
   void mergeLocalIds(FlatAffineConstraints &other);
 
+  void mergeDivisions(FlatAffineConstraints &other);
+
   /// Removes all equalities and inequalities.
   void clearConstraints();
 
@@ -517,6 +519,9 @@ protected:
 
   /// Normalized each constraints by the GCD of its coefficients.
   void normalizeConstraintsByGCD();
+
+  void getLocalIdsReprs(std::vector<SmallVector<int64_t, 8>> &reprs,
+                        SmallVector<unsigned, 8> &denominator);
 
   /// Removes identifiers in the column range [idStart, idLimit), and copies any
   /// remaining valid data into place, updates member variables, and resizes

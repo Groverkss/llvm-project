@@ -1382,6 +1382,12 @@ static LogicalResult getDivRepr(const FlatAffineConstraints &cst, unsigned pos,
                                 SmallVector<int64_t, 8> &expr,
                                 unsigned &divisor) {
 
+  assert(pos <= cst.getNumIds() && "Invalid identifier position");
+  assert(ubIneq <= cst.getNumInequalities() &&
+         "Invalid upper bound inequality position");
+  assert(lbIneq <= cst.getNumInequalities() &&
+         "Invalid upper bound inequality position");
+
   // Due to the form of the inequalities, sum of constants of the
   // inequalities is (divisor - 1).
   int64_t denominator = cst.atIneq(lbIneq, cst.getNumCols() - 1) +
@@ -1905,6 +1911,34 @@ void FlatAffineConstraints::removeRedundantConstraints() {
   equalities.resizeVertically(pos);
 }
 
+void FlatAffineConstraints::getLocalIdsReprs(
+    std::vector<SmallVector<int64_t, 8>> &reprs,
+    SmallVector<unsigned, 8> &denominators) {
+
+  assert(reprs.size() == getNumLocalIds() &&
+         "Size of reprs must be equal to number of local ids");
+  assert(denominators.size() == getNumLocalIds() &&
+         "Size of denominators must be equal to number of local ids");
+
+  std::vector<Optional<std::pair<unsigned, unsigned>>> divIneqPairs(
+      getNumLocalIds());
+  getLocalReprLbUbPairs(divIneqPairs);
+
+  for (unsigned i = 0, e = getNumLocalIds(); i < e; ++i) {
+    if (!divIneqPairs[i].hasValue()) {
+      denominators[i] = 0;
+      continue;
+    }
+
+    std::pair<unsigned, unsigned> divPair = divIneqPairs[i].getValue();
+    LogicalResult divExtracted =
+        getDivRepr(*this, i + getIdKindOffset(IdKind::Local), divPair.first,
+                   divPair.second, reprs[i], denominators[i]);
+    assert(succeeded(divExtracted) &&
+           "Div should have been found since ub-lb pair exists");
+  }
+}
+
 /// Merge local ids of `this` and `other`. This is done by appending local ids
 /// of `other` to `this` and inserting local ids of `this` to `other` at start
 /// of its local ids.
@@ -1912,6 +1946,63 @@ void FlatAffineConstraints::mergeLocalIds(FlatAffineConstraints &other) {
   unsigned initLocals = getNumLocalIds();
   insertLocalId(getNumLocalIds(), other.getNumLocalIds());
   other.insertLocalId(0, initLocals);
+}
+
+void FlatAffineConstraints::mergeDivisions(FlatAffineConstraints &other) {
+  FlatAffineConstraints &fac1 = *this;
+  FlatAffineConstraints &fac2 = other;
+
+  // Get divisions inequality pairs from each FAC.
+  std::vector<SmallVector<int64_t, 8>> divs1(fac1.getNumLocalIds()),
+      divs2(fac2.getNumLocalIds());
+  SmallVector<unsigned, 8> denoms1(fac1.getNumLocalIds()),
+      denoms2(fac2.getNumLocalIds());
+
+  fac1.getLocalIdsReprs(divs1, denoms1);
+  fac2.getLocalIdsReprs(divs2, denoms2);
+
+  auto dependsOnExist = [&](FlatAffineConstraints &fac,
+                            SmallVector<int64_t, 8> &div) {
+    return false;
+  };
+
+  unsigned offset = fac2.getIdKindOffset(IdKind::Local);
+  for (unsigned i = 0, e = fac1.getNumLocalIds(); i < e; ++i) {
+    // Check if a division exists in fac2 which can be merged with this division
+    unsigned j, f;
+    for (j = i, f = fac2.getNumLocalIds(); j < f; ++j) {
+      // Cannot be matched since division representation does not exist.
+      if (denoms2[j] == 0)
+        continue;
+      // Check if denominators match.
+      if (denoms1[i] != denoms2[j])
+        continue;
+      // Check if representation is equal.
+      if (!std::equal(divs1[i].begin(), divs1[i].end(), divs2[j].begin()))
+        continue;
+      // If division representation contains a local variable, do not match.
+      if (dependsOnExist(fac2, divs2[j]))
+        continue;
+
+      // Match found, merge divisions.
+      fac2.swapId(i + offset, j + offset);
+      std::swap(divs2[i], divs2[j]);
+
+      break;
+    }
+
+    // Match was found.
+    if (j < f)
+      continue;
+
+    // Match not found, insert local variable.
+    fac2.insertLocalId(i);
+    divs2.insert(divs2.begin() + i, divs1[i]);
+    denoms2.insert(denoms2.begin() + i, denoms1[i]);
+  }
+
+  // Add extra local variables from fac2 to fac1
+  fac1.appendLocalId(fac2.getNumLocalIds() - fac1.getNumLocalIds());
 }
 
 /// Removes local variables using equalities. Each equality is checked if it
