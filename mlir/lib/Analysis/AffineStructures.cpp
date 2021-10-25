@@ -1949,6 +1949,12 @@ void FlatAffineConstraints::mergeLocalIds(FlatAffineConstraints &other) {
 }
 
 void FlatAffineConstraints::mergeDivisions(FlatAffineConstraints &other) {
+
+  assert(getNumDimIds() == other.getNumDimIds() &&
+         "This and other should have same number of dimension identifiers");
+  assert(getNumSymbolIds() == other.getNumSymbolIds() &&
+         "This and other should have same number of symbol identifiers");
+
   FlatAffineConstraints &fac1 = *this;
   FlatAffineConstraints &fac2 = other;
 
@@ -1963,7 +1969,11 @@ void FlatAffineConstraints::mergeDivisions(FlatAffineConstraints &other) {
 
   auto dependsOnExist = [&](FlatAffineConstraints &fac,
                             SmallVector<int64_t, 8> &div) {
-    return false;
+    for (unsigned i = fac.getIdKindOffset(IdKind::Local), e = fac.getNumIds();
+         i < e; ++i)
+      if (div[i] != 0)
+        return false;
+    return true;
   };
 
   unsigned offset = fac2.getIdKindOffset(IdKind::Local);
