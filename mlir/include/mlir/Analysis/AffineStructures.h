@@ -435,6 +435,11 @@ public:
   /// of its local ids.
   void mergeLocalIds(FlatAffineConstraints &other);
 
+  /// Same as `mergeLocalIds` but merges two local identifiers into one if
+  /// their division representation is same.
+  /// Number of dimensions and symbols in `this` and `other` should be same.
+  void mergeDivisions(FlatAffineConstraints &other);
+
   /// Removes all equalities and inequalities.
   void clearConstraints();
 
@@ -517,6 +522,12 @@ protected:
 
   /// Normalized each constraints by the GCD of its coefficients.
   void normalizeConstraintsByGCD();
+
+  /// Get division representation for each local identifier. If no local
+  /// representation exists for the `i^th` local identifier, denominator[i] is
+  /// set to 0.
+  void getLocalIdsReprs(std::vector<SmallVector<int64_t, 8>> &reprs,
+                        SmallVector<unsigned, 8> &denominator);
 
   /// Removes identifiers in the column range [idStart, idLimit), and copies any
   /// remaining valid data into place, updates member variables, and resizes

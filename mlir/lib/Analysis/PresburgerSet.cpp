@@ -200,7 +200,7 @@ static void subtractRecursively(FlatAffineConstraints &b, Simplex &simplex,
 
   // Add sI's locals to b, after b's locals. Also add b's locals to sI, before
   // sI's locals.
-  b.mergeLocalIds(sI);
+  b.mergeDivisions(sI);
 
   // Mark which inequalities of sI are division inequalities and add all such
   // inequalities to b.
