@@ -116,12 +116,10 @@ void PresburgerBasicSet::removeId(IdKind kind, unsigned pos) {
   removeIdRange(kind, pos, pos + 1);
 }
 
-void PresburgerBasicSet::removeId(unsigned pos) {
-  removeIdRange(pos, pos + 1);
-}
+void PresburgerBasicSet::removeId(unsigned pos) { removeIdRange(pos, pos + 1); }
 
 void PresburgerBasicSet::removeIdRange(IdKind kind, unsigned idStart,
-                                          unsigned idLimit) {
+                                       unsigned idLimit) {
   assertAtMostNumIdKind(idLimit, kind);
   removeIdRange(getIdKindOffset(kind) + idStart,
                 getIdKindOffset(kind) + idLimit);
@@ -176,8 +174,7 @@ void PresburgerBasicSet::removeEqualityRange(unsigned begin, unsigned end) {
   equalities.removeRows(begin, end - begin);
 }
 
-void PresburgerBasicSet::removeInequalityRange(unsigned begin,
-                                                  unsigned end) {
+void PresburgerBasicSet::removeInequalityRange(unsigned begin, unsigned end) {
   if (begin >= end)
     return;
   inequalities.removeRows(begin, end - begin);
@@ -207,7 +204,7 @@ unsigned PresburgerBasicSet::getIdKindOffset(IdKind kind) const {
 }
 
 void PresburgerBasicSet::assertAtMostNumIdKind(unsigned val,
-                                                  IdKind kind) const {
+                                               IdKind kind) const {
   if (kind == IdKind::Dimension)
     assert(val <= getNumDimIds());
   else if (kind == IdKind::Symbol)

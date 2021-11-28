@@ -17,6 +17,34 @@
 
 namespace mlir {
 
+/// A basic set is the set of solutions to a list of affine constraints over n
+/// integer-valued variables/identifiers. Affine constraints can be inequalities
+/// or equalities in the form:
+///
+/// Inequality: c_0*x_0 + c_1*x_1 + .... + c_{n-1}*x_{n-1} + c_n >= 0
+/// Equality  : c_0*x_0 + c_1*x_1 + .... + c_{n-1}*x_{n-1} + c_n == 0
+///
+/// where c_0, c_1, ..., c_n are integers.
+///
+/// Such a set corresponds to the set of integer points lying in a convex
+/// polytope. For example, consider the set: (x, y) : (1 <= x <= 7, x = 2y).
+/// This set contains the points (2, 1), (4, 2), and (6, 3).
+///
+/// The integer-valued variables are distinguished into 3 types of:
+///
+/// Dimension: Ordinary variables over which the set is represented.
+///
+/// Symbol: Symbol variables correspond to fixed but unknown values.
+/// Mathematically, a basic set with symbolic variables is like a family of
+/// basic sets indexed by the symbolic variables.
+///
+/// Local: Local variables correspond to local/internal variables used to
+/// represent existential quantification. For example, consider the set: (x) :
+/// (exists q : 1 <= x <= 10, x = 3y). An assignment to symbolic and dimension
+/// variables is valid if there exists some assignment to the existentially
+/// quantified variables satisfying these constraints. For this example, the set
+/// is equivalent to {3, 6, 9}.
+///
 class PresburgerBasicSet {
 public:
   /// Kind of identifier (column).
