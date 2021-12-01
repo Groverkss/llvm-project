@@ -1374,6 +1374,19 @@ bool FlatAffineConstraints::containsPoint(ArrayRef<int64_t> point) const {
 ///       expr = i + j + 1, divisor = 4
 ///       q = (i + j + 1) floordiv 4
 ///
+/// Sometimes, due to additional constraints, the original upper bound of the
+/// floor division may be removed. For example:
+///       i - 3q - 1 >= 0                       <-- `ineq1`
+///       i - 3q + 2 <= 0                       <-- Upper bound for 'q'
+///       i - 3q     >= 0                       <-- Lower bound for 'q'
+///
+/// Here, `ineq1` makes the upper bound for 'q' redundant, and thus the upper
+/// bound may be removed. To extract floor divisions in cases where `ineq` is
+/// given as `ubIneq`, we relax the conditions on upper bound for the local
+/// variable to:
+//
+///       -divisor * id + expr - c >= 0, where 0 <= c <= divisor - 1
+///
 /// If successful, `expr` is set to dividend of the division and `divisor` is
 /// set to the denominator of the division.
 static LogicalResult getDivRepr(const FlatAffineConstraints &cst, unsigned pos,
@@ -1388,16 +1401,31 @@ static LogicalResult getDivRepr(const FlatAffineConstraints &cst, unsigned pos,
          "Invalid upper bound inequality position");
 
   // Due to the form of the inequalities, sum of constants of the
-  // inequalities is (divisor - 1).
-  int64_t denominator = cst.atIneq(lbIneq, cst.getNumCols() - 1) +
-                        cst.atIneq(ubIneq, cst.getNumCols() - 1) + 1;
+  // inequalities is `divisor - 1 - c` as shown in the relaxed lower bound.
+  // We check the condition `0 <= c <= divisor - 1` by checking two conditions
+  // on sum of constants:
+  //
+  // 1. Sum of constants >= 0
+  //    divisor - 1 - c >= 0
+  //    divisor - 1 >= c
+  //
+  // 2. Sum of constants <= divisor - 1
+  //    divisor - 1 - c <= divisor - 1
+  //    c >= 0
+  //
+  //    These two conditions together check the conditions on c:
+  //    0 <= c <= divisor - 1
+  //
+  //    which satisfies the relaxed upper bound inequality form.
+  int64_t constantSum = cst.atIneq(lbIneq, cst.getNumCols() - 1) +
+                        cst.atIneq(ubIneq, cst.getNumCols() - 1);
 
-  // Divisor should be positive.
-  if (denominator <= 0)
+  // constantSum should be non negative.
+  if (constantSum < 0)
     return failure();
 
-  // Check if coeff of variable is equal to divisor.
-  if (denominator != cst.atIneq(lbIneq, pos))
+  // constantSum should be less than equal to divisor - 1.
+  if (constantSum >= cst.atIneq(lbIneq, pos))
     return failure();
 
   // Check if constraints are opposite of each other. Constant term
@@ -1410,15 +1438,20 @@ static LogicalResult getDivRepr(const FlatAffineConstraints &cst, unsigned pos,
   if (i < e)
     return failure();
 
-  // Set expr with dividend of the division.
-  SmallVector<int64_t, 8> dividend(cst.getNumCols());
-  for (i = 0, e = cst.getNumCols(); i < e; ++i)
+  // Extract divisor from the lower bound.
+  divisor = cst.atIneq(lbIneq, pos);
+
+  // Set expr with dividend of the division except constant term.
+  SmallVector<int64_t, 8> dividend(cst.getNumCols(), 0);
+  for (i = 0, e = cst.getNumIds(); i < e; ++i)
     if (i != pos)
       dividend[i] = cst.atIneq(ubIneq, i);
-  expr = dividend;
 
-  // Set divisor.
-  divisor = denominator;
+  // Set constant term of dividend. From the lower bound form:
+  // constant term of dividend = (divisor - 1) - constant term of lower bound.
+  dividend.back() = (divisor - 1) - cst.atIneq(lbIneq, cst.getNumCols() - 1);
+
+  expr = dividend;
 
   return success();
 }
