@@ -3,6 +3,7 @@ add_mlir_library(MLIRPresburger
   LinearTransform.cpp
   Matrix.cpp
   PresburgerSet.cpp
+  PresburgerSpace.cpp
   Simplex.cpp
   Utils.cpp
 

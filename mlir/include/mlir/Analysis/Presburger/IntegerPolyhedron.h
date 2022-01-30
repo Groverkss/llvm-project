@@ -15,6 +15,7 @@
 
 #include "mlir/Analysis/Presburger/Fraction.h"
 #include "mlir/Analysis/Presburger/Matrix.h"
+#include "mlir/Analysis/Presburger/PresburgerSpace.h"
 #include "mlir/Analysis/Presburger/Utils.h"
 #include "mlir/Support/LogicalResult.h"
 
@@ -50,7 +51,8 @@ namespace mlir {
 /// example, `q` is existentially quantified. This can be thought of as the
 /// result of projecting out `q` from the previous example, i.e. we obtained {2,
 /// 4, 6} by projecting out the second dimension from {(2, 1), (4, 2), (6, 2)}.
-class IntegerPolyhedron {
+///
+class IntegerPolyhedron : public PresburgerLocalSpace {
 public:
   /// All derived classes of IntegerPolyhedron.
   enum class Kind {
@@ -59,16 +61,12 @@ public:
     IntegerPolyhedron
   };
 
-  /// Kind of identifier (column).
-  enum IdKind { Dimension, Symbol, Local };
-
   /// Constructs a constraint system reserving memory for the specified number
   /// of constraints and identifiers.
   IntegerPolyhedron(unsigned numReservedInequalities,
                     unsigned numReservedEqualities, unsigned numReservedCols,
                     unsigned numDims, unsigned numSymbols, unsigned numLocals)
-      : numIds(numDims + numSymbols + numLocals), numDims(numDims),
-        numSymbols(numSymbols),
+      : PresburgerLocalSpace(numDims, numSymbols, numLocals),
         equalities(0, numIds + 1, numReservedEqualities, numReservedCols),
         inequalities(0, numIds + 1, numReservedInequalities, numReservedCols) {
     assert(numReservedCols >= numIds + 1);
@@ -127,13 +125,6 @@ public:
 
   unsigned getNumConstraints() const {
     return getNumInequalities() + getNumEqualities();
-  }
-  inline unsigned getNumIds() const { return numIds; }
-  inline unsigned getNumDimIds() const { return numDims; }
-  inline unsigned getNumSymbolIds() const { return numSymbols; }
-  inline unsigned getNumDimAndSymbolIds() const { return numDims + numSymbols; }
-  inline unsigned getNumLocalIds() const {
-    return numIds - numDims - numSymbols;
   }
 
   /// Returns the number of columns in the constraint system.
@@ -484,12 +475,6 @@ protected:
   /// IntegerPolyhedron.
   virtual void printSpace(raw_ostream &os) const;
 
-  /// Return the index at which the specified kind of id starts.
-  unsigned getIdKindOffset(IdKind kind) const;
-
-  /// Get the number of ids of the specified kind.
-  unsigned getNumIdKind(IdKind kind) const;
-
   /// Removes identifiers in the column range [idStart, idLimit), and copies any
   /// remaining valid data into place, updates member variables, and resizes
   /// arrays as needed.
@@ -506,16 +491,6 @@ protected:
   // don't expect an identifier to have more than 32 lower/upper/equality
   // constraints. This is conservatively set low and can be raised if needed.
   constexpr static unsigned kExplosionFactor = 32;
-
-  /// Total number of identifiers.
-  unsigned numIds;
-
-  /// Number of identifiers corresponding to real dimensions.
-  unsigned numDims;
-
-  /// Number of identifiers corresponding to symbols (unknown but constant for
-  /// analysis).
-  unsigned numSymbols;
 
   /// Coefficients of affine equalities (in == 0 form).
   Matrix equalities;

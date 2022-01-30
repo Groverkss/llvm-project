@@ -99,14 +99,10 @@ unsigned IntegerPolyhedron::insertId(IdKind kind, unsigned pos, unsigned num) {
   assert(pos <= getNumIdKind(kind));
 
   unsigned absolutePos = getIdKindOffset(kind) + pos;
-  if (kind == IdKind::Dimension)
-    numDims += num;
-  else if (kind == IdKind::Symbol)
-    numSymbols += num;
-  numIds += num;
-
   inequalities.insertColumns(absolutePos, num);
   equalities.insertColumns(absolutePos, num);
+
+  insertIdSpace(kind, num);
 
   return absolutePos;
 }
@@ -222,26 +218,6 @@ void IntegerPolyhedron::swapId(unsigned posA, unsigned posB) {
     std::swap(atIneq(r, posA), atIneq(r, posB));
   for (unsigned r = 0, e = getNumEqualities(); r < e; r++)
     std::swap(atEq(r, posA), atEq(r, posB));
-}
-
-unsigned IntegerPolyhedron::getIdKindOffset(IdKind kind) const {
-  if (kind == IdKind::Dimension)
-    return 0;
-  if (kind == IdKind::Symbol)
-    return getNumDimIds();
-  if (kind == IdKind::Local)
-    return getNumDimAndSymbolIds();
-  llvm_unreachable("IdKind expected to be Dimension, Symbol or Local!");
-}
-
-unsigned IntegerPolyhedron::getNumIdKind(IdKind kind) const {
-  if (kind == IdKind::Dimension)
-    return getNumDimIds();
-  if (kind == IdKind::Symbol)
-    return getNumSymbolIds();
-  if (kind == IdKind::Local)
-    return getNumLocalIds();
-  llvm_unreachable("IdKind expected to be Dimension, Symbol or Local!");
 }
 
 void IntegerPolyhedron::clearConstraints() {
