@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mlir/Analysis/Presburger/PresburgerSet.h"
 #include "./Utils.h"
+#include "mlir/Analysis/Presburger/PresburgerRelation.h"
 #include "mlir/IR/MLIRContext.h"
 
 #include <gmock/gmock.h>

@@ -1,4 +1,4 @@
-//===- Set.cpp - MLIR PresburgerSet Class ---------------------------------===//
+//===- PresburgerRelation.cpp - MLIR PresburgerRelation Class -------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "mlir/Analysis/Presburger/PresburgerSet.h"
+#include "mlir/Analysis/Presburger/PresburgerRelation.h"
 #include "mlir/Analysis/Presburger/Simplex.h"
 #include "mlir/Analysis/Presburger/Utils.h"
 #include "llvm/ADT/STLExtras.h"
@@ -16,66 +16,70 @@
 using namespace mlir;
 using namespace presburger;
 
-PresburgerSet::PresburgerSet(const IntegerPolyhedron &poly)
+PresburgerRelation::PresburgerRelation(const IntegerRelation &poly)
     : PresburgerSpace(poly) {
   unionInPlace(poly);
 }
 
-unsigned PresburgerSet::getNumPolys() const {
-  return integerPolyhedrons.size();
+unsigned PresburgerRelation::getNumPolys() const {
+  return integerRelations.size();
 }
 
-ArrayRef<IntegerPolyhedron> PresburgerSet::getAllPolys() const {
-  return integerPolyhedrons;
+ArrayRef<IntegerRelation> PresburgerRelation::getAllPolys() const {
+  return integerRelations;
 }
 
-const IntegerPolyhedron &PresburgerSet::getPoly(unsigned index) const {
-  assert(index < integerPolyhedrons.size() && "index out of bounds!");
-  return integerPolyhedrons[index];
+const IntegerRelation &PresburgerRelation::getPoly(unsigned index) const {
+  assert(index < integerRelations.size() && "index out of bounds!");
+  return integerRelations[index];
 }
 
 /// Mutate this set, turning it into the union of this set and the given
-/// IntegerPolyhedron.
-void PresburgerSet::unionInPlace(const IntegerPolyhedron &poly) {
+/// IntegerRelation.
+void PresburgerRelation::unionInPlace(const IntegerRelation &poly) {
   assert(PresburgerSpace::isEqual(poly) && "Spaces should match");
-  integerPolyhedrons.push_back(poly);
+  integerRelations.push_back(poly);
 }
 
 /// Mutate this set, turning it into the union of this set and the given set.
 ///
 /// This is accomplished by simply adding all the polyhedrons of the given set
 /// to this set.
-void PresburgerSet::unionInPlace(const PresburgerSet &set) {
+void PresburgerRelation::unionInPlace(const PresburgerRelation &set) {
   assert(PresburgerSpace::isEqual(set) && "Spaces should match");
-  for (const IntegerPolyhedron &poly : set.integerPolyhedrons)
+  for (const IntegerRelation &poly : set.integerRelations)
     unionInPlace(poly);
 }
 
 /// Return the union of this set and the given set.
-PresburgerSet PresburgerSet::unionSet(const PresburgerSet &set) const {
+PresburgerRelation
+PresburgerRelation::unionSet(const PresburgerRelation &set) const {
   assert(PresburgerSpace::isEqual(set) && "Spaces should match");
-  PresburgerSet result = *this;
+  PresburgerRelation result = *this;
   result.unionInPlace(set);
   return result;
 }
 
 /// A point is contained in the union iff any of the parts contain the point.
-bool PresburgerSet::containsPoint(ArrayRef<int64_t> point) const {
-  return llvm::any_of(integerPolyhedrons, [&](const IntegerPolyhedron &poly) {
+bool PresburgerRelation::containsPoint(ArrayRef<int64_t> point) const {
+  return llvm::any_of(integerRelations, [&](const IntegerRelation &poly) {
     return (poly.containsPoint(point));
   });
 }
 
-PresburgerSet PresburgerSet::getUniverse(unsigned numDims,
-                                         unsigned numSymbols) {
-  PresburgerSet result(numDims, numSymbols);
-  result.unionInPlace(IntegerPolyhedron::getUniverse(numDims, numSymbols));
+PresburgerRelation PresburgerRelation::getUniverse(unsigned numDomain,
+                                                   unsigned numRange,
+                                                   unsigned numSymbols) {
+  PresburgerRelation result(numDomain, numRange, numSymbols);
+  result.unionInPlace(
+      IntegerRelation::getUniverse(numDomain, numRange, numSymbols));
   return result;
 }
 
-PresburgerSet PresburgerSet::getEmptySet(unsigned numDims,
-                                         unsigned numSymbols) {
-  return PresburgerSet(numDims, numSymbols);
+PresburgerRelation PresburgerRelation::getEmptyRel(unsigned numDomain,
+                                                   unsigned numRange,
+                                                   unsigned numSymbols) {
+  return PresburgerRelation(numDomain, numRange, numSymbols);
 }
 
 // Return the intersection of this set with the given set.
@@ -85,13 +89,15 @@ PresburgerSet PresburgerSet::getEmptySet(unsigned numDims,
 //
 // If S_i or T_j have local variables, then S_i and T_j contains the local
 // variables of both.
-PresburgerSet PresburgerSet::intersect(const PresburgerSet &set) const {
+PresburgerRelation
+PresburgerRelation::intersect(const PresburgerRelation &set) const {
   assert(PresburgerSpace::isEqual(set) && "Spaces should match");
 
-  PresburgerSet result(getNumDimIds(), getNumSymbolIds());
-  for (const IntegerPolyhedron &csA : integerPolyhedrons) {
-    for (const IntegerPolyhedron &csB : set.integerPolyhedrons) {
-      IntegerPolyhedron csACopy = csA, csBCopy = csB;
+  PresburgerRelation result(getNumDomainIds(), getNumRangeIds(),
+                            getNumSymbolIds());
+  for (const IntegerRelation &csA : integerRelations) {
+    for (const IntegerRelation &csB : set.integerRelations) {
+      IntegerRelation csACopy = csA, csBCopy = csB;
       csACopy.mergeLocalIds(csBCopy);
       csACopy.append(csBCopy);
       if (!csACopy.isEmpty())
@@ -129,7 +135,7 @@ static SmallVector<int64_t, 8> getComplementIneq(ArrayRef<int64_t> ineq) {
 ///
 /// In the following, U denotes union, ^ denotes intersection, \ denotes set
 /// difference and ~ denotes complement.
-/// Let b be the IntegerPolyhedron and s = (U_i s_i) be the set. We want
+/// Let b be the IntegerRelation and s = (U_i s_i) be the set. We want
 /// b \ (U_i s_i).
 ///
 /// Let s_i = ^_j s_ij, where each s_ij is a single inequality. To compute
@@ -159,14 +165,14 @@ static SmallVector<int64_t, 8> getComplementIneq(ArrayRef<int64_t> ineq) {
 ///
 /// b and simplex are callee saved, i.e., their values on return are
 /// semantically equivalent to their values when the function is called.
-static void subtractRecursively(IntegerPolyhedron &b, Simplex &simplex,
-                                const PresburgerSet &s, unsigned i,
-                                PresburgerSet &result) {
+static void subtractRecursively(IntegerRelation &b, Simplex &simplex,
+                                const PresburgerRelation &s, unsigned i,
+                                PresburgerRelation &result) {
   if (i == s.getNumPolys()) {
     result.unionInPlace(b);
     return;
   }
-  IntegerPolyhedron sI = s.getPoly(i);
+  IntegerRelation sI = s.getPoly(i);
 
   // Below, we append some additional constraints and ids to b. We want to
   // rollback b to its initial state before returning, which we will do by
@@ -302,33 +308,37 @@ static void subtractRecursively(IntegerPolyhedron &b, Simplex &simplex,
 /// The polyhedron here is modified in subtractRecursively, so it cannot be a
 /// const reference even though it is restored to its original state before
 /// returning from that function.
-static PresburgerSet getSetDifference(IntegerPolyhedron poly,
-                                      const PresburgerSet &set) {
+static PresburgerRelation getSetDifference(IntegerRelation poly,
+                                           const PresburgerRelation &set) {
   assert(poly.PresburgerSpace::isEqual(set) && "Spaces should match");
   if (poly.isEmptyByGCDTest())
-    return PresburgerSet::getEmptySet(poly.getNumDimIds(),
-                                      poly.getNumSymbolIds());
+    return PresburgerRelation::getEmptyRel(
+        poly.getNumDomainIds(), poly.getNumRangeIds(), poly.getNumSymbolIds());
 
-  PresburgerSet result =
-      PresburgerSet::getEmptySet(poly.getNumDimIds(), poly.getNumSymbolIds());
+  PresburgerRelation result = PresburgerRelation::getEmptyRel(
+      poly.getNumDomainIds(), poly.getNumRangeIds(), poly.getNumSymbolIds());
   Simplex simplex(poly);
   subtractRecursively(poly, simplex, set, 0, result);
   return result;
 }
 
 /// Return the complement of this set.
-PresburgerSet PresburgerSet::complement() const {
-  return getSetDifference(
-      IntegerPolyhedron::getUniverse(getNumDimIds(), getNumSymbolIds()), *this);
+PresburgerRelation PresburgerRelation::complement() const {
+  return getSetDifference(IntegerRelation::getUniverse(getNumDomainIds(),
+                                                       getNumRangeIds(),
+                                                       getNumSymbolIds()),
+                          *this);
 }
 
 /// Return the result of subtract the given set from this set, i.e.,
 /// return `this \ set`.
-PresburgerSet PresburgerSet::subtract(const PresburgerSet &set) const {
+PresburgerRelation
+PresburgerRelation::subtract(const PresburgerRelation &set) const {
   assert(PresburgerSpace::isEqual(set) && "Spaces should match");
-  PresburgerSet result(getNumDimIds(), getNumSymbolIds());
+  PresburgerRelation result(getNumDomainIds(), getNumRangeIds(),
+                            getNumSymbolIds());
   // We compute (U_i t_i) \ (U_i set_i) as U_i (t_i \ V_i set_i).
-  for (const IntegerPolyhedron &poly : integerPolyhedrons)
+  for (const IntegerRelation &poly : integerRelations)
     result.unionInPlace(getSetDifference(poly, set));
   return result;
 }
@@ -336,28 +346,28 @@ PresburgerSet PresburgerSet::subtract(const PresburgerSet &set) const {
 /// T is a subset of S iff T \ S is empty, since if T \ S contains a
 /// point then this is a point that is contained in T but not S, and
 /// if T contains a point that is not in S, this also lies in T \ S.
-bool PresburgerSet::isSubsetOf(const PresburgerSet &set) const {
+bool PresburgerRelation::isSubsetOf(const PresburgerRelation &set) const {
   return this->subtract(set).isIntegerEmpty();
 }
 
 /// Two sets are equal iff they are subsets of each other.
-bool PresburgerSet::isEqual(const PresburgerSet &set) const {
+bool PresburgerRelation::isEqual(const PresburgerRelation &set) const {
   assert(PresburgerSpace::isEqual(set) && "Spaces should match");
   return this->isSubsetOf(set) && set.isSubsetOf(*this);
 }
 
 /// Return true if all the sets in the union are known to be integer empty,
 /// false otherwise.
-bool PresburgerSet::isIntegerEmpty() const {
+bool PresburgerRelation::isIntegerEmpty() const {
   // The set is empty iff all of the disjuncts are empty.
   return std::all_of(
-      integerPolyhedrons.begin(), integerPolyhedrons.end(),
-      [](const IntegerPolyhedron &poly) { return poly.isIntegerEmpty(); });
+      integerRelations.begin(), integerRelations.end(),
+      [](const IntegerRelation &poly) { return poly.isIntegerEmpty(); });
 }
 
-bool PresburgerSet::findIntegerSample(SmallVectorImpl<int64_t> &sample) {
+bool PresburgerRelation::findIntegerSample(SmallVectorImpl<int64_t> &sample) {
   // A sample exists iff any of the disjuncts contains a sample.
-  for (const IntegerPolyhedron &poly : integerPolyhedrons) {
+  for (const IntegerRelation &poly : integerRelations) {
     if (Optional<SmallVector<int64_t, 8>> opt = poly.findIntegerSample()) {
       sample = std::move(*opt);
       return true;
@@ -366,12 +376,12 @@ bool PresburgerSet::findIntegerSample(SmallVectorImpl<int64_t> &sample) {
   return false;
 }
 
-Optional<uint64_t> PresburgerSet::computeVolume() const {
+Optional<uint64_t> PresburgerRelation::computeVolume() const {
   assert(getNumSymbolIds() == 0 && "Symbols are not yet supported!");
   // The sum of the volumes of the disjuncts is a valid overapproximation of the
   // volume of their union, even if they overlap.
   uint64_t result = 0;
-  for (const IntegerPolyhedron &poly : integerPolyhedrons) {
+  for (const IntegerRelation &poly : integerRelations) {
     Optional<uint64_t> volume = poly.computeVolume();
     if (!volume)
       return {};
@@ -380,12 +390,12 @@ Optional<uint64_t> PresburgerSet::computeVolume() const {
   return result;
 }
 
-/// Given an IntegerPolyhedron `p` and one of its inequalities `ineq`, check
+/// Given an IntegerRelation `p` and one of its inequalities `ineq`, check
 /// that all inequalities of `cuttingIneqs` are redundant for the facet of `p`
 /// where `ineq` holds as an equality. `simp` must be the Simplex constructed
 /// from `p`.
 static bool isFacetContained(ArrayRef<int64_t> ineq, Simplex &simp,
-                             IntegerPolyhedron &p,
+                             IntegerRelation &p,
                              ArrayRef<ArrayRef<int64_t>> cuttingIneqs) {
   unsigned snapshot = simp.getSnapshot();
   simp.addEquality(ineq);
@@ -403,15 +413,15 @@ static bool isFacetContained(ArrayRef<int64_t> ineq, Simplex &simp,
 /// `j`. Updates `simplices` to reflect the changes. `i` and `j` cannot be
 /// equal.
 static void
-addCoalescedPolyhedron(SmallVectorImpl<IntegerPolyhedron> &polyhedrons,
-                       unsigned i, unsigned j, const IntegerPolyhedron &poly,
+addCoalescedPolyhedron(SmallVectorImpl<IntegerRelation> &polyhedrons,
+                       unsigned i, unsigned j, const IntegerRelation &poly,
                        SmallVectorImpl<Simplex> &simplices) {
   assert(i != j && "The indices must refer to different polyhedra");
 
   unsigned n = polyhedrons.size();
   if (j == n - 1) {
     // This case needs special handling since position `n` - 1 is removed from
-    // the vector, hence the `IntegerPolyhedron` at position `n` - 2 is lost
+    // the vector, hence the `IntegerRelation` at position `n` - 2 is lost
     // otherwise.
     polyhedrons[i] = polyhedrons[n - 2];
     polyhedrons.pop_back();
@@ -423,7 +433,7 @@ addCoalescedPolyhedron(SmallVectorImpl<IntegerPolyhedron> &polyhedrons,
 
   } else {
     // Other possible edge cases are correct since for `j` or `i` == `n` - 2,
-    // the `IntegerPolyhedron` at position `n` - 2 should be lost. The case
+    // the `IntegerRelation` at position `n` - 2 should be lost. The case
     // `i` == `n` - 1 makes the first following statement a noop. Hence, in this
     // case the same thing is done as above, but with `j` rather than `i`.
     polyhedrons[i] = polyhedrons[n - 1];
@@ -454,7 +464,7 @@ addCoalescedPolyhedron(SmallVectorImpl<IntegerPolyhedron> &polyhedrons,
 ///
 ///
 static LogicalResult
-coalescePairCutCase(SmallVectorImpl<IntegerPolyhedron> &polyhedrons,
+coalescePairCutCase(SmallVectorImpl<IntegerRelation> &polyhedrons,
                     SmallVectorImpl<Simplex> &simplices, unsigned i, unsigned j,
                     ArrayRef<ArrayRef<int64_t>> redundantIneqsA,
                     ArrayRef<ArrayRef<int64_t>> cuttingIneqsA,
@@ -463,14 +473,14 @@ coalescePairCutCase(SmallVectorImpl<IntegerPolyhedron> &polyhedrons,
   /// All inequalities of `b` need to be redundant. We already know that the
   /// redundant ones are, so only the cutting ones remain to be checked.
   Simplex &simp = simplices[i];
-  IntegerPolyhedron &poly = polyhedrons[i];
+  IntegerRelation &poly = polyhedrons[i];
   if (llvm::any_of(cuttingIneqsA,
                    [&simp, &poly, &cuttingIneqsB](ArrayRef<int64_t> curr) {
                      return !isFacetContained(curr, simp, poly, cuttingIneqsB);
                    }))
     return failure();
-  IntegerPolyhedron newSet(poly.getNumDimIds(), poly.getNumSymbolIds(),
-                           poly.getNumLocalIds());
+  IntegerRelation newSet(poly.getNumDomainIds(), poly.getNumRangeIds(),
+                         poly.getNumSymbolIds(), poly.getNumLocalIds());
 
   for (ArrayRef<int64_t> curr : redundantIneqsA)
     newSet.addInequality(curr);
@@ -520,7 +530,7 @@ typeEquality(ArrayRef<int64_t> eq, Simplex &simp,
 /// Replaces the element at position `i` with the last element and erases the
 /// last element for both `polyhedrons` and `simplices`.
 static void erasePolyhedron(unsigned i,
-                            SmallVectorImpl<IntegerPolyhedron> &polyhedrons,
+                            SmallVectorImpl<IntegerRelation> &polyhedrons,
                             SmallVectorImpl<Simplex> &simplices) {
   assert(simplices.size() == polyhedrons.size() &&
          "simplices and polyhedrons must be equally as long");
@@ -530,18 +540,17 @@ static void erasePolyhedron(unsigned i,
   simplices.pop_back();
 }
 
-/// Attempts to coalesce the two IntegerPolyhedrons at position `i` and `j` in
+/// Attempts to coalesce the two IntegerRelations at position `i` and `j` in
 /// `polyhedrons` in-place. Returns whether the polyhedrons were successfully
 /// coalesced. The simplices in `simplices` need to be the ones constructed from
 /// `polyhedrons`. At this point, there are no empty polyhedrons in
 /// `polyhedrons` left.
-static LogicalResult
-coalescePair(unsigned i, unsigned j,
-             SmallVectorImpl<IntegerPolyhedron> &polyhedrons,
-             SmallVectorImpl<Simplex> &simplices) {
+static LogicalResult coalescePair(unsigned i, unsigned j,
+                                  SmallVectorImpl<IntegerRelation> &polyhedrons,
+                                  SmallVectorImpl<Simplex> &simplices) {
 
-  IntegerPolyhedron &a = polyhedrons[i];
-  IntegerPolyhedron &b = polyhedrons[j];
+  IntegerRelation &a = polyhedrons[i];
+  IntegerRelation &b = polyhedrons[j];
   /// Handling of local ids is not yet implemented, so these cases are skipped.
   /// TODO: implement local id support.
   if (a.getNumLocalIds() != 0 || b.getNumLocalIds() != 0)
@@ -556,7 +565,7 @@ coalescePair(unsigned i, unsigned j,
   // Organize all inequalities and equalities of `a` according to their type for
   // `b` into `redundantIneqsA` and `cuttingIneqsA` (and vice versa for all
   // inequalities of `b` according to their type in `a`). If a separate
-  // inequality is encountered during typing, the two IntegerPolyhedrons cannot
+  // inequality is encountered during typing, the two IntegerRelations cannot
   // be coalesced.
   for (int k = 0, e = a.getNumInequalities(); k < e; ++k)
     if (typeInequality(a.getInequality(k), simpB, redundantIneqsA,
@@ -610,10 +619,10 @@ coalescePair(unsigned i, unsigned j,
   return failure();
 }
 
-PresburgerSet PresburgerSet::coalesce() const {
-  PresburgerSet newSet =
-      PresburgerSet::getEmptySet(getNumDimIds(), getNumSymbolIds());
-  SmallVector<IntegerPolyhedron, 2> polyhedrons = integerPolyhedrons;
+PresburgerRelation PresburgerRelation::coalesce() const {
+  PresburgerRelation newSet = PresburgerRelation::getEmptyRel(
+      getNumDomainIds(), getNumRangeIds(), getNumSymbolIds());
+  SmallVector<IntegerRelation, 2> polyhedrons = integerRelations;
   SmallVector<Simplex, 2> simplices;
 
   simplices.reserve(getNumPolys());
@@ -629,8 +638,8 @@ PresburgerSet PresburgerSet::coalesce() const {
     simplices.push_back(simp);
   }
 
-  // For all tuples of IntegerPolyhedrons, check whether they can be coalesced.
-  // When coalescing is successful, the contained IntegerPolyhedron is swapped
+  // For all tuples of IntegerRelations, check whether they can be coalesced.
+  // When coalescing is successful, the contained IntegerRelation is swapped
   // with the last element of `polyhedrons` and subsequently erased and
   // similarly for simplices.
   for (unsigned i = 0; i < polyhedrons.size();) {
@@ -648,7 +657,7 @@ PresburgerSet PresburgerSet::coalesce() const {
     }
 
     // Only if the inner loop was not broken, i is incremented. This is
-    // required as otherwise, if a coalescing occurs, the IntegerPolyhedron
+    // required as otherwise, if a coalescing occurs, the IntegerRelation
     // now at position i is not compared.
     if (!broken)
       ++i;
@@ -660,12 +669,50 @@ PresburgerSet PresburgerSet::coalesce() const {
   return newSet;
 }
 
-void PresburgerSet::print(raw_ostream &os) const {
+void PresburgerRelation::print(raw_ostream &os) const {
   os << "Number of Polyhedrons: " << getNumPolys() << "\n";
-  for (const IntegerPolyhedron &poly : integerPolyhedrons) {
+  for (const IntegerRelation &poly : integerRelations) {
     poly.print(os);
     os << '\n';
   }
 }
 
-void PresburgerSet::dump() const { print(llvm::errs()); }
+void PresburgerRelation::dump() const { print(llvm::errs()); }
+
+PresburgerSet PresburgerSet::getUniverse(unsigned numDims,
+                                         unsigned numSymbols) {
+  PresburgerSet result(numDims, numSymbols);
+  result.unionInPlace(IntegerPolyhedron::getUniverse(numDims, numSymbols));
+  return result;
+}
+
+PresburgerSet PresburgerSet::getEmptySet(unsigned numDims,
+                                         unsigned numSymbols) {
+  return PresburgerSet(numDims, numSymbols);
+}
+
+PresburgerSet::PresburgerSet(const IntegerPolyhedron &poly)
+    : PresburgerRelation(poly) {}
+
+PresburgerSet::PresburgerSet(const PresburgerRelation &set)
+    : PresburgerRelation(set) {}
+
+PresburgerSet PresburgerSet::unionSet(const PresburgerRelation &set) const {
+  return PresburgerSet(PresburgerRelation::unionSet(set));
+}
+
+PresburgerSet PresburgerSet::intersect(const PresburgerRelation &set) const {
+  return PresburgerSet(PresburgerRelation::intersect(set));
+}
+
+PresburgerSet PresburgerSet::complement() const {
+  return PresburgerSet(PresburgerRelation::complement());
+}
+
+PresburgerSet PresburgerSet::subtract(const PresburgerRelation &set) const {
+  return PresburgerSet(PresburgerRelation::subtract(set));
+}
+
+PresburgerSet PresburgerSet::coalesce() const {
+  return PresburgerSet(PresburgerRelation::coalesce());
+}
