@@ -18,7 +18,7 @@
 namespace mlir {
 namespace presburger {
 
-/// A PresburgerRelation represents a union of IntegerRelations that live in
+/// A PresburgerUnion represents a union of IntegerRelations that live in
 /// the same PresburgerSpace with support for union, intersection, subtraction,
 /// and complement operations, as well as sampling.
 ///
@@ -29,59 +29,77 @@ namespace presburger {
 /// Note that there are no invariants guaranteed on the list of polyhedrons
 /// other than that they are all in the same PresburgerSpace. For example, the
 /// polyhedrons may overlap each other.
-class PresburgerRelation : public PresburgerSpace {
+template <typename PolyhedronImpl>
+class PresburgerUnion : public PresburgerSpace {
+
+  /// Assert that only Relation and Set are supported.
+  static_assert(
+      std::is_same<PolyhedronImpl, IntegerRelation>::value ||
+          std::is_same<PolyhedronImpl, IntegerPolyhedron>::value,
+      "PolyhedronImpl should be of type IntegerRelation or IntegerPolyhedron");
+
 public:
   /// Return a universe set of the specified type that contains all points.
-  static PresburgerRelation getUniverse(unsigned numDomain, unsigned numRange,
-                                        unsigned numSymbols);
+  static PresburgerUnion getUniverse(const PresburgerSpace &space);
 
   /// Return an empty set of the specified type that contains no points.
-  static PresburgerRelation getEmptyRel(unsigned numDomain, unsigned numRange,
-                                        unsigned numSymbols);
+  static PresburgerUnion getEmpty(const PresburgerSpace &space);
 
-  explicit PresburgerRelation(const IntegerRelation &poly);
+  /// Return a universe set of the specified type that contains all points.
+  static PresburgerUnion getUniverse(unsigned numDims = 0,
+                                     unsigned numSymbols = 0) {
+    return getUniverse(PresburgerSpace(/*numDomain=*/0, numDims, numSymbols));
+  }
+
+  /// Return an empty set of the specified type that contains no points.
+  static PresburgerUnion getEmpty(unsigned numDims = 0,
+                                  unsigned numSymbols = 0) {
+    return getEmpty(PresburgerSpace(/*numDomain=*/0, numDims, numSymbols));
+  }
+
+  explicit PresburgerUnion(const PolyhedronImpl &poly);
 
   /// Return the number of Polys in the union.
   unsigned getNumPolys() const;
 
-  /// Return a reference to the list of IntegerRelations.
-  ArrayRef<IntegerRelation> getAllPolys() const;
+  /// Return a reference to the list of PolyhedronImpls.
+  ArrayRef<PolyhedronImpl> getAllPolys() const;
 
-  /// Return the IntegerRelation at the specified index.
-  const IntegerRelation &getPoly(unsigned index) const;
+  /// Return the PolyhedronImpl at the specified index.
+  const PolyhedronImpl &getPoly(unsigned index) const;
 
   /// Mutate this set, turning it into the union of this set and the given
-  /// IntegerRelation.
-  void unionInPlace(const IntegerRelation &poly);
+  /// PolyhedronImpl.
+  void unionInPlace(const PolyhedronImpl &poly);
 
   /// Mutate this set, turning it into the union of this set and the given set.
-  void unionInPlace(const PresburgerRelation &set);
+  void unionInPlace(const PresburgerUnion &set);
 
   /// Return the union of this set and the given set.
-  PresburgerRelation unionSet(const PresburgerRelation &set) const;
+  PresburgerUnion unionSet(const PresburgerUnion &set) const;
 
   /// Return the intersection of this set and the given set.
-  PresburgerRelation intersect(const PresburgerRelation &set) const;
+  PresburgerUnion intersect(const PresburgerUnion &set) const;
 
   /// Return true if the set contains the given point, and false otherwise.
   bool containsPoint(ArrayRef<int64_t> point) const;
 
   /// Return the complement of this set. All local variables in the set must
   /// correspond to floor divisions.
-  PresburgerRelation complement() const;
+  PresburgerUnion complement() const;
 
   /// Return the set difference of this set and the given set, i.e.,
   /// return `this \ set`. All local variables in `set` must correspond
   /// to floor divisions, but local variables in `this` need not correspond to
   /// divisions.
-  PresburgerRelation subtract(const PresburgerRelation &set) const;
+  PresburgerUnion subtract(const PresburgerUnion &set) const;
 
   /// Return true if this set is a subset of the given set, and false otherwise.
-  bool isSubsetOf(const PresburgerRelation &set) const;
+  bool isSubsetOf(const PresburgerUnion &set) const;
 
   /// Return true if this set is equal to the given set, and false otherwise.
   /// All local variables in both sets must correspond to floor divisions.
-  bool isEqual(const PresburgerRelation &set) const;
+  bool isEqual(const PresburgerUnion &set) const;
 
   /// Return true if all the sets in the union are known to be integer empty
   /// false otherwise.
@@ -100,57 +118,29 @@ public:
   /// case when there is a lot of overlap between disjuncts.
   Optional<uint64_t> computeVolume() const;
 
-  /// Simplifies the representation of a PresburgerRelation.
+  /// Simplifies the representation of a PresburgerUnion.
   ///
   /// In particular, removes all polyhedrons which are subsets of other
   /// polyhedrons in the union.
-  PresburgerRelation coalesce() const;
+  PresburgerUnion coalesce() const;
 
   /// Print the set's internal state.
   void print(raw_ostream &os) const;
   void dump() const;
 
 protected:
-  /// Construct an empty PresburgerRelation with the specified number of
+  /// Construct an empty PresburgerUnion with the specified number of
   /// dimension and symbols.
-  PresburgerRelation(unsigned numDomain = 0, unsigned numRange = 0,
-                     unsigned numSymbols = 0)
+  PresburgerUnion(unsigned numDomain = 0, unsigned numRange = 0,
+                  unsigned numSymbols = 0)
       : PresburgerSpace(numDomain, numRange, numSymbols) {}
 
   /// The list of polyhedrons that this set is the union of.
-  SmallVector<IntegerRelation, 2> integerRelations;
+  SmallVector<PolyhedronImpl, 2> polyhedronImpls;
 };
 
-class PresburgerSet : public PresburgerRelation {
-public:
-  /// Return a universe set of the specified type that contains all points.
-  static PresburgerSet getUniverse(unsigned numDims = 0,
-                                   unsigned numSymbols = 0);
-
-  /// Return an empty set of the specified type that contains no points.
-  static PresburgerSet getEmptySet(unsigned numDims = 0,
-                                   unsigned numSymbols = 0);
-
-  explicit PresburgerSet(const IntegerPolyhedron &poly);
-
-  explicit PresburgerSet(const PresburgerRelation &set);
-
-  PresburgerSet unionSet(const PresburgerRelation &set) const;
-
-  PresburgerSet intersect(const PresburgerRelation &set) const;
-
-  PresburgerSet complement() const;
-
-  PresburgerSet subtract(const PresburgerRelation &set) const;
-
-  PresburgerSet coalesce() const;
-
-protected:
-  /// Construct an empty PresburgerRelation with the specified number of
-  /// dimension and symbols.
-  PresburgerSet(unsigned numDims = 0, unsigned numSymbols = 0)
-      : PresburgerRelation(/*numDomain=*/0, numDims, numSymbols) {}
-};
+using PresburgerRelation = PresburgerUnion<IntegerRelation>;
+using PresburgerSet = PresburgerUnion<IntegerPolyhedron>;
 
 } // namespace presburger
 } // namespace mlir

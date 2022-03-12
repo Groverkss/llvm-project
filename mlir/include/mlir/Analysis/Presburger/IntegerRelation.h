@@ -75,12 +75,25 @@ public:
                             numLocals + 1,
                         numDomain, numRange, numSymbols, numLocals) {}
 
+  IntegerRelation(const PresburgerLocalSpace &space)
+      : IntegerRelation(space.getNumDomainIds(), space.getNumRangeIds(),
+                        space.getNumSymbolIds(), space.getNumLocalIds()) {}
+
+  IntegerRelation(const PresburgerSpace &space)
+      : IntegerRelation(space.getNumDomainIds(), space.getNumRangeIds(),
+                        space.getNumSymbolIds()) {}
+
   /// Return a system with no constraints, i.e., one which is satisfied by all
   /// points.
   static IntegerRelation getUniverse(unsigned numDomain = 0,
                                      unsigned numRange = 0,
                                      unsigned numSymbols = 0) {
     return IntegerRelation(numDomain, numRange, numSymbols);
+  }
+
+  static IntegerRelation getUniverse(const PresburgerSpace &space) {
+    return IntegerRelation(space.getNumDomainIds(), space.getNumRangeIds(),
+                           space.getNumSymbolIds());
   }
 
   /// Return the kind of this IntegerRelation.
@@ -537,11 +550,25 @@ public:
                               1,
                           numDims, numSymbols, numLocals) {}
 
+  IntegerPolyhedron(const PresburgerLocalSpace &space)
+      : IntegerRelation(space) {
+    assert(space.getNumDomainIds() == 0);
+  }
+
+  IntegerPolyhedron(const PresburgerSpace &space) : IntegerRelation(space) {
+    assert(space.getNumDomainIds() == 0);
+  }
+
   /// Return a system with no constraints, i.e., one which is satisfied by all
   /// points.
   static IntegerPolyhedron getUniverse(unsigned numDims = 0,
                                        unsigned numSymbols = 0) {
     return IntegerPolyhedron(numDims, numSymbols);
+  }
+
+  static IntegerPolyhedron getUniverse(const PresburgerSpace &space) {
+    assert(space.getNumDomainIds() == 0);
+    return IntegerPolyhedron(space.getNumDimIds(), space.getNumSymbolIds());
   }
 
   /// Return the kind of this IntegerRelation.

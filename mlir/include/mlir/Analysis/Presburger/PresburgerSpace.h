@@ -67,7 +67,8 @@ class PresburgerSpace {
   friend PresburgerLocalSpace;
 
 public:
-  PresburgerSpace(unsigned numDomain, unsigned numRange, unsigned numSymbols)
+  PresburgerSpace(unsigned numDomain = 0, unsigned numRange = 0,
+                  unsigned numSymbols = 0)
       : PresburgerSpace(numDomain, numRange, numSymbols, 0) {}
 
   virtual ~PresburgerSpace() = default;
@@ -84,6 +85,8 @@ public:
   unsigned getNumIds() const {
     return numDomain + numRange + numSymbols + numLocals;
   }
+
+  PresburgerSpace getSpace() const { return *this; }
 
   /// Get the number of ids of the specified kind.
   unsigned getNumIdKind(IdKind kind) const;
@@ -145,11 +148,13 @@ private:
 /// Extension of PresburgerSpace supporting Local identifiers.
 class PresburgerLocalSpace : public PresburgerSpace {
 public:
-  PresburgerLocalSpace(unsigned numDomain, unsigned numRange,
-                       unsigned numSymbols, unsigned numLocals)
+  PresburgerLocalSpace(unsigned numDomain = 0, unsigned numRange = 0,
+                       unsigned numSymbols = 0, unsigned numLocals = 0)
       : PresburgerSpace(numDomain, numRange, numSymbols, numLocals) {}
 
   unsigned getNumLocalIds() const { return numLocals; }
+
+  PresburgerLocalSpace getLocalSpace() const { return *this; }
 
   /// Insert `num` identifiers of the specified kind at position `pos`.
   /// Positions are relative to the kind of identifier. Return the absolute
