@@ -14,11 +14,21 @@
 #ifndef MLIR_ANALYSIS_PRESBURGER_PRESBURGERSPACE_H
 #define MLIR_ANALYSIS_PRESBURGER_PRESBURGERSPACE_H
 
+#include "mlir/Support/LLVM.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace mlir {
 namespace presburger {
+
+struct AbstractIdValue {
+public:
+  AbstractIdValue() = delete;
+
+  virtual ~AbstractIdValue() = default;
+
+  virtual bool isEqual(const AbstractIdValue *other) { return false; }
+};
 
 /// Kind of identifier. Implementation wise SetDims are treated as Range
 /// ids, and spaces with no distinction between dimension ids are treated
@@ -85,7 +95,9 @@ public:
   /// Returns the space without locals. This function is primarily intended to
   /// be used from derived classes.
   PresburgerSpace getSpaceWithoutLocals() const {
-    return PresburgerSpace(numDomain, numRange, numSymbols);
+    PresburgerSpace retSpace = *this;
+    retSpace.numLocals = 0;
+    return retSpace;
   }
 
   virtual ~PresburgerSpace() = default;
@@ -103,6 +115,8 @@ public:
   unsigned getNumIds() const {
     return numDomain + numRange + numSymbols + numLocals;
   }
+
+  AbstractIdValue *&atIdValue(IdKind kind, unsigned pos);
 
   /// Get the number of ids of the specified kind.
   unsigned getNumIdKind(IdKind kind) const;
@@ -157,7 +171,7 @@ protected:
   PresburgerSpace(unsigned numDomain = 0, unsigned numRange = 0,
                   unsigned numSymbols = 0, unsigned numLocals = 0)
       : numDomain(numDomain), numRange(numRange), numSymbols(numSymbols),
-        numLocals(numLocals) {}
+        numLocals(numLocals), idValues(numDomain + numRange + numSymbols) {}
 
 private:
   // Number of identifiers corresponding to domain identifiers.
@@ -173,6 +187,8 @@ private:
   /// Number of identifers corresponding to locals (identifiers corresponding
   /// to existentially quantified variables).
   unsigned numLocals;
+
+  SmallVector<AbstractIdValue *, 8> idValues;
 };
 
 } // namespace presburger

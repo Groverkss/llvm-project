@@ -7,11 +7,17 @@
 //===----------------------------------------------------------------------===//
 
 #include "mlir/Analysis/Presburger/PresburgerSpace.h"
+#include "llvm/ADT/ArrayRef.h"
 #include <algorithm>
 #include <cassert>
 
 using namespace mlir;
 using namespace presburger;
+
+AbstractIdValue *&PresburgerSpace::atIdValue(IdKind kind, unsigned pos) {
+  assert(pos <= getNumIdKind(kind));
+  return idValues[getIdKindOffset(kind) + pos];
+}
 
 unsigned PresburgerSpace::getNumIdKind(IdKind kind) const {
   if (kind == IdKind::Domain)
@@ -73,15 +79,25 @@ unsigned PresburgerSpace::insertId(IdKind kind, unsigned pos, unsigned num) {
   assert(pos <= getNumIdKind(kind));
 
   unsigned absolutePos = getIdKindOffset(kind) + pos;
+  unsigned offsetPos = getIdKindOffset(kind) + pos;
 
-  if (kind == IdKind::Domain)
+  switch (kind) {
+  case IdKind::Domain:
     numDomain += num;
-  else if (kind == IdKind::Range)
+    idValues.insert(idValues.begin() + offsetPos, num, nullptr);
+    break;
+  case IdKind::Range:
     numRange += num;
-  else if (kind == IdKind::Symbol)
+    idValues.insert(idValues.begin() + offsetPos, num, nullptr);
+    break;
+  case IdKind::Symbol:
     numSymbols += num;
-  else
+    idValues.insert(idValues.begin() + offsetPos, num, nullptr);
+    break;
+  case IdKind::Local:
     numLocals += num;
+    break;
+  }
 
   return absolutePos;
 }
@@ -94,14 +110,29 @@ void PresburgerSpace::removeIdRange(IdKind kind, unsigned idStart,
     return;
 
   unsigned numIdsEliminated = idLimit - idStart;
-  if (kind == IdKind::Domain)
+  unsigned offsetStart = getIdKindOffset(kind) + idStart;
+  unsigned offsetLimit = getIdKindOffset(kind) + idLimit;
+
+  switch (kind) {
+  case IdKind::Domain:
     numDomain -= numIdsEliminated;
-  else if (kind == IdKind::Range)
+    idValues.erase(idValues.begin() + offsetStart,
+                   idValues.begin() + offsetLimit);
+    break;
+  case IdKind::Range:
     numRange -= numIdsEliminated;
-  else if (kind == IdKind::Symbol)
+    idValues.erase(idValues.begin() + offsetStart,
+                   idValues.begin() + offsetLimit);
+    break;
+  case IdKind::Symbol:
     numSymbols -= numIdsEliminated;
-  else
+    idValues.erase(idValues.begin() + offsetStart,
+                   idValues.begin() + offsetLimit);
+    break;
+  case IdKind::Local:
     numLocals -= numIdsEliminated;
+    break;
+  }
 }
 
 void PresburgerSpace::truncateIdKind(IdKind kind, unsigned num) {
@@ -110,10 +141,31 @@ void PresburgerSpace::truncateIdKind(IdKind kind, unsigned num) {
   removeIdRange(kind, num, curNum);
 }
 
+static bool checkIdValuesEqual(ArrayRef<AbstractIdValue *> values1,
+                               ArrayRef<AbstractIdValue *> values2) {
+  if (values1.size() != values2.size())
+    return false;
+
+  for (unsigned i = 0, e = values1.size(); i < e; ++i) {
+    // Empty values are considered equal.
+    if (values1[i] == nullptr && values2[i] == nullptr)
+      continue;
+
+    // If one of the values is nullptr while other isn't, return false.
+    if (values1[i] == nullptr || values2[i] == nullptr)
+      return false;
+
+    if (!values1[i]->isEqual(values2[i]))
+      return false;
+  }
+  return true;
+}
+
 bool PresburgerSpace::isSpaceCompatible(const PresburgerSpace &other) const {
   return getNumDomainIds() == other.getNumDomainIds() &&
          getNumRangeIds() == other.getNumRangeIds() &&
-         getNumSymbolIds() == other.getNumSymbolIds();
+         getNumSymbolIds() == other.getNumSymbolIds() &&
+         checkIdValuesEqual(idValues, other.idValues);
 }
 
 bool PresburgerSpace::isSpaceEqual(const PresburgerSpace &other) const {
@@ -123,6 +175,8 @@ bool PresburgerSpace::isSpaceEqual(const PresburgerSpace &other) const {
 void PresburgerSpace::setDimSymbolSeparation(unsigned newSymbolCount) {
   assert(newSymbolCount <= getNumDimAndSymbolIds() &&
          "invalid separation position");
+  // Due to the way symbols are stored in idValues,
+  // we do no need to modify idValues.
   numRange = numRange + numSymbols - newSymbolCount;
   numSymbols = newSymbolCount;
 }
