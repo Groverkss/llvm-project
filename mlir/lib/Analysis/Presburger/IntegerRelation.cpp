@@ -39,7 +39,7 @@ std::unique_ptr<IntegerPolyhedron> IntegerPolyhedron::clone() const {
 }
 
 void IntegerRelation::append(const IntegerRelation &other) {
-  assert(space.isSpaceEqual(other.getSpace()) && "Spaces must be equal.");
+  assert(space.isEqual(other.getSpace()) && "Spaces must be equal.");
 
   inequalities.reserveRows(inequalities.getNumRows() +
                            other.getNumInequalities());
@@ -61,12 +61,12 @@ IntegerRelation IntegerRelation::intersect(IntegerRelation other) const {
 }
 
 bool IntegerRelation::isEqual(const IntegerRelation &other) const {
-  assert(space.isSpaceEqual(other.getSpace()) && "Spaces must be equal.");
+  assert(space.isEqual(other.getSpace()) && "Spaces must be equal.");
   return PresburgerRelation(*this).isEqual(PresburgerRelation(other));
 }
 
 bool IntegerRelation::isSubsetOf(const IntegerRelation &other) const {
-  assert(space.isSpaceEqual(other.getSpace()) && "Spaces must be equal.");
+  assert(space.isEqual(other.getSpace()) && "Spaces must be equal.");
   return PresburgerRelation(*this).isSubsetOf(PresburgerRelation(other));
 }
 
@@ -1089,7 +1089,7 @@ void IntegerRelation::eliminateRedundantLocalId(unsigned posA, unsigned posB) {
 /// division representation for some local id cannot be obtained, and thus these
 /// local ids are not considered for detecting duplicates.
 void IntegerRelation::mergeLocalIds(IntegerRelation &other) {
-  assert(space.isSpaceCompatible(other.getSpace()) &&
+  assert(space.isCompatible(other.getSpace()) &&
          "Spaces should be compatible.");
 
   IntegerRelation &relA = *this;
@@ -1920,7 +1920,7 @@ static void getCommonConstraints(const IntegerRelation &a,
 // lower bounds and the max of the upper bounds along each of the dimensions.
 LogicalResult
 IntegerRelation::unionBoundingBox(const IntegerRelation &otherCst) {
-  assert(space.isSpaceEqual(otherCst.getSpace()) && "Spaces should match.");
+  assert(space.isEqual(otherCst.getSpace()) && "Spaces should match.");
   assert(getNumLocalIds() == 0 && "local ids not supported yet here");
 
   // Get the constraints common to both systems; these will be added as is to

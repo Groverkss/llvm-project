@@ -87,9 +87,14 @@ public:
   // Clones this object.
   std::unique_ptr<IntegerRelation> clone() const;
 
+  /// Returns a reference to the underlying space.
   const PresburgerSpace &getSpace() const { return space; }
+
+  /// Returns a copy of the space without locals.
   PresburgerSpace getSpaceWithoutLocals() const {
-    return space.getSpaceWithoutLocals();
+    return PresburgerSpace::getRelationSpace(space.getNumDomainIds(),
+                                             space.getNumRangeIds(),
+                                             space.getNumSymbolIds());
   }
 
   /// Appends constraints from `other` into `this`. This is equivalent to an
