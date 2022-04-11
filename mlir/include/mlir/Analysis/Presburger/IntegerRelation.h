@@ -24,8 +24,9 @@
 namespace mlir {
 namespace presburger {
 
-/// An IntegerRelation is a PresburgerSpace subject to affine constraints.
-/// Affine constraints can be inequalities or equalities in the form:
+/// An IntegerRelation is a set of affine constraints living in a
+/// PresburgerSpace. Affine constraints can be inequalities or equalities in the
+/// form:
 ///
 /// Inequality: c_0*x_0 + c_1*x_1 + .... + c_{n-1}*x_{n-1} + c_n >= 0
 /// Equality  : c_0*x_0 + c_1*x_1 + .... + c_{n-1}*x_{n-1} + c_n == 0
@@ -594,8 +595,8 @@ protected:
 };
 
 struct SymbolicLexMin;
-/// An IntegerPolyhedron is a PresburgerSpace subject to affine
-/// constraints. Affine constraints can be inequalities or equalities in the
+/// An IntegerPolyhedron is a set of affine constraints living in a
+/// PresburgerSpace. Affine constraints can be inequalities or equalities in the
 /// form:
 ///
 /// Inequality: c_0*x_0 + c_1*x_1 + .... + c_{n-1}*x_{n-1} + c_n >= 0
