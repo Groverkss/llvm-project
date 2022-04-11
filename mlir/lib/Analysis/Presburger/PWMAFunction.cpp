@@ -83,7 +83,8 @@ void MultiAffineFunction::print(raw_ostream &os) const {
 void MultiAffineFunction::dump() const { print(llvm::errs()); }
 
 bool MultiAffineFunction::isEqual(const MultiAffineFunction &other) const {
-  return isSpaceCompatible(other) && getDomain().isEqual(other.getDomain()) &&
+  return space.isSpaceCompatible(other.getSpace()) &&
+         getDomain().isEqual(other.getDomain()) &&
          isEqualWhereDomainsOverlap(other);
 }
 
@@ -128,7 +129,7 @@ void PWMAFunction::truncateOutput(unsigned count) {
 
 bool MultiAffineFunction::isEqualWhereDomainsOverlap(
     MultiAffineFunction other) const {
-  if (!isSpaceCompatible(other))
+  if (!space.isSpaceCompatible(other.getSpace()))
     return false;
 
   // `commonFunc` has the same output as `this`.
@@ -179,7 +180,7 @@ bool PWMAFunction::isEqual(const PWMAFunction &other) const {
 }
 
 void PWMAFunction::addPiece(const MultiAffineFunction &piece) {
-  assert(piece.isSpaceCompatible(space) &&
+  assert(space.isSpaceCompatible(piece.getSpace()) &&
          "Piece to be added is not compatible with this PWMAFunction!");
   assert(piece.isConsistent() && "Piece is internally inconsistent!");
   assert(this->getDomain()

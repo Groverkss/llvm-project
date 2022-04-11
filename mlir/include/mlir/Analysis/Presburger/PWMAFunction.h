@@ -52,8 +52,7 @@ public:
   using IntegerPolyhedron::getNumIds;
   using IntegerPolyhedron::getNumLocalIds;
   using IntegerPolyhedron::getNumSymbolIds;
-  using PresburgerSpace::isSpaceCompatible;
-  using PresburgerSpace::isSpaceEqual;
+  using IntegerPolyhedron::getSpace;
 
   MultiAffineFunction(const IntegerPolyhedron &domain, const Matrix &output)
       : IntegerPolyhedron(domain), output(output) {}
