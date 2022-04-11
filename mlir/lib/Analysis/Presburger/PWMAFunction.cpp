@@ -161,7 +161,7 @@ bool MultiAffineFunction::isEqualWhereDomainsOverlap(
 /// Two PWMAFunctions are equal if they have the same dimensionalities,
 /// the same domain, and take the same value at every point in the domain.
 bool PWMAFunction::isEqual(const PWMAFunction &other) const {
-  if (!isSpaceCompatible(other))
+  if (!space.isSpaceCompatible(other.space))
     return false;
 
   if (!this->getDomain().isEqual(other.getDomain()))
@@ -179,7 +179,7 @@ bool PWMAFunction::isEqual(const PWMAFunction &other) const {
 }
 
 void PWMAFunction::addPiece(const MultiAffineFunction &piece) {
-  assert(piece.isSpaceCompatible(*this) &&
+  assert(piece.isSpaceCompatible(space) &&
          "Piece to be added is not compatible with this PWMAFunction!");
   assert(piece.isConsistent() && "Piece is internally inconsistent!");
   assert(this->getDomain()
