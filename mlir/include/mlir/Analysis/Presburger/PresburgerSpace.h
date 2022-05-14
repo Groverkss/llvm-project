@@ -132,6 +132,9 @@ public:
   /// idLimit). The range is relative to the kind of identifier.
   void removeIdRange(IdKind kind, unsigned idStart, unsigned idLimit);
 
+  /// TODO: Write doc.
+  void swapId(IdKind kindA, IdKind kindB, unsigned posA, unsigned posB);
+
   /// Returns true if both the spaces are compatible i.e. if both spaces have
   /// the same number of identifiers of each kind (excluding locals).
   bool isCompatible(const PresburgerSpace &other) const;

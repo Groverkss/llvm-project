@@ -125,6 +125,11 @@ public:
   }
   inline int64_t &atIneq(unsigned i, unsigned j) { return inequalities(i, j); }
 
+  void *&atValue(IdKind kind, unsigned i) { return space.atValue(kind, i); }
+  void *atValue(IdKind kind, unsigned i) const {
+    return space.atValue(kind, i);
+  }
+
   unsigned getNumConstraints() const {
     return getNumInequalities() + getNumEqualities();
   }

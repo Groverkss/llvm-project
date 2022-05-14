@@ -113,6 +113,24 @@ void PresburgerSpace::removeIdRange(IdKind kind, unsigned idStart,
                  values.begin() + getIdKindOffset(kind) + idLimit);
 }
 
+void PresburgerSpace::swapId(IdKind kindA, IdKind kindB, unsigned posA,
+                             unsigned posB) {
+
+  if (!usingValues)
+    return;
+
+  if (kindA == IdKind::Local && kindB == IdKind::Local)
+    return;
+
+  if (kindA == IdKind::Local)
+    atValue(kindB, posB) = nullptr;
+
+  if (kindB == IdKind::Local)
+    atValue(kindA, posA) = nullptr;
+
+  std::swap(atValue(kindA, posA), atValue(kindB, posB));
+}
+
 bool PresburgerSpace::isCompatible(const PresburgerSpace &other) const {
   return getNumDomainIds() == other.getNumDomainIds() &&
          getNumRangeIds() == other.getNumRangeIds() &&

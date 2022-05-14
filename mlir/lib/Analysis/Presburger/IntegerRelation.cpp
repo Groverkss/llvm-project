@@ -284,6 +284,8 @@ void IntegerRelation::swapId(unsigned posA, unsigned posB) {
 
   inequalities.swapColumns(posA, posB);
   equalities.swapColumns(posA, posB);
+
+  space.swapId(getIdKindAt(posA), getIdKindAt(posB), posA, posB);
 }
 
 void IntegerRelation::clearConstraints() {
