@@ -62,20 +62,33 @@ enum class IdKind { Symbol, Local, Domain, Range, SetDim = Range };
 /// Compatibility of two spaces implies that number of identifiers of each kind
 /// other than Locals are equal. Equality of two spaces implies that number of
 /// identifiers of each kind are equal.
+///
+/// PresburgerSpace also allows attaching a `void` pointer to each identifier
+/// to allow attaching information with a value. Local identifiers cannot have a
+/// value attached to them.
+///
+/// To allow attaching these values, a space needs to be constructed with
+/// `usingValues` as `true`. If values are being used, two values are considered
+/// equal if they hold the same address. A `NULL` value is considered
+/// uninitialized and is considered unique, i.e. 2 variables with a `NULL` value
+/// are not equal.
 class PresburgerSpace {
 public:
   static PresburgerSpace getRelationSpace(unsigned numDomain = 0,
                                           unsigned numRange = 0,
                                           unsigned numSymbols = 0,
-                                          unsigned numLocals = 0) {
-    return PresburgerSpace(numDomain, numRange, numSymbols, numLocals);
+                                          unsigned numLocals = 0,
+                                          bool usingValues = false) {
+    return PresburgerSpace(numDomain, numRange, numSymbols, numLocals,
+                           usingValues);
   }
 
   static PresburgerSpace getSetSpace(unsigned numDims = 0,
                                      unsigned numSymbols = 0,
-                                     unsigned numLocals = 0) {
+                                     unsigned numLocals = 0,
+                                     bool usingValues = false) {
     return PresburgerSpace(/*numDomain=*/0, /*numRange=*/numDims, numSymbols,
-                           numLocals);
+                           numLocals, usingValues);
   }
 
   unsigned getNumDomainIds() const { return numDomain; }
@@ -137,11 +150,26 @@ public:
   void print(llvm::raw_ostream &os) const;
   void dump() const;
 
+  //===--------------------------------------------------------------------===//
+  //     Value Interactions
+  //===--------------------------------------------------------------------===//
+
+  void *&atValue(IdKind kind, unsigned i) {
+    assert(usingValues && "Cannot access values when `usingValues` is false.");
+    return values[getIdKindOffset(kind) + i];
+  }
+  void *atValue(IdKind kind, unsigned i) const {
+    assert(usingValues && "Cannot access values when `usingValues` is false.");
+    return values[getIdKindOffset(kind) + i];
+  }
+
 protected:
   PresburgerSpace(unsigned numDomain = 0, unsigned numRange = 0,
-                  unsigned numSymbols = 0, unsigned numLocals = 0)
+                  unsigned numSymbols = 0, unsigned numLocals = 0,
+                  bool usingValues = false)
       : numDomain(numDomain), numRange(numRange), numSymbols(numSymbols),
-        numLocals(numLocals) {}
+        numLocals(numLocals), usingValues(usingValues),
+        values(numDomain + numRange + numSymbols) {}
 
 private:
   // Number of identifiers corresponding to domain identifiers.
@@ -157,6 +185,12 @@ private:
   /// Number of identifers corresponding to locals (identifiers corresponding
   /// to existentially quantified variables).
   unsigned numLocals;
+
+  /// Stores whether or not values are attached to this space.
+  bool usingValues;
+
+  /// Stores a value for each non-local identifier as a `void` pointer.
+  llvm::SmallVector<void *> values;
 };
 
 } // namespace presburger

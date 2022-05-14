@@ -83,6 +83,10 @@ unsigned PresburgerSpace::insertId(IdKind kind, unsigned pos, unsigned num) {
   else
     numLocals += num;
 
+  // Insert NULL values if `usingValues` and variables inserted are not locals.
+  if (usingValues && kind != IdKind::Local)
+    values.insert(values.begin() + absolutePos, num, nullptr);
+
   return absolutePos;
 }
 
@@ -102,6 +106,11 @@ void PresburgerSpace::removeIdRange(IdKind kind, unsigned idStart,
     numSymbols -= numIdsEliminated;
   else
     numLocals -= numIdsEliminated;
+
+  // Remove values if `usingValues` and variables removed are not locals.
+  if (usingValues && kind != IdKind::Local)
+    values.erase(values.begin() + getIdKindOffset(kind) + idStart,
+                 values.begin() + getIdKindOffset(kind) + idLimit);
 }
 
 bool PresburgerSpace::isCompatible(const PresburgerSpace &other) const {
@@ -119,6 +128,8 @@ void PresburgerSpace::setDimSymbolSeparation(unsigned newSymbolCount) {
          "invalid separation position");
   numRange = numRange + numSymbols - newSymbolCount;
   numSymbols = newSymbolCount;
+  // We do not need to change `values` since the ordering of `values` remains
+  // same.
 }
 
 void PresburgerSpace::print(llvm::raw_ostream &os) const {
@@ -126,6 +137,13 @@ void PresburgerSpace::print(llvm::raw_ostream &os) const {
      << "Range: " << getNumRangeIds() << ", "
      << "Symbols: " << getNumSymbolIds() << ", "
      << "Locals: " << getNumLocalIds() << "\n";
+
+  if (usingValues) {
+    os << "(";
+    for (void *value : values)
+      os << value << " ";
+    os << ")\n";
+  }
 }
 
 void PresburgerSpace::dump() const { print(llvm::errs()); }
