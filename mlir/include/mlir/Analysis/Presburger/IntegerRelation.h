@@ -125,6 +125,18 @@ public:
   }
   inline int64_t &atIneq(unsigned i, unsigned j) { return inequalities(i, j); }
 
+  /// Set the value attached to the `i^th` variable to `value`.
+  template <typename T>
+  void setValue(IdKind kind, unsigned i, T value) {
+    space.setValue<T>(kind, i, value);
+  }
+
+  /// Get the value attached to the `i^th` variable casted to type `T`.
+  template <typename T>
+  T getValue(IdKind kind, unsigned i) const {
+    return space.getValue<T>(kind, i);
+  }
+
   unsigned getNumConstraints() const {
     return getNumInequalities() + getNumEqualities();
   }
