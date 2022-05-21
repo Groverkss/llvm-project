@@ -2080,6 +2080,43 @@ void IntegerRelation::removeIndependentConstraints(unsigned pos, unsigned num) {
     removeEquality(nbIndex);
 }
 
+IntegerPolyhedron IntegerRelation::getDomainSet() {
+  IntegerRelation copyRel = *this;
+
+  // Convert Range variables to Local variables.
+  copyRel.convertIdKind(IdKind::Range, 0, getNumIdKind(IdKind::Range),
+                        IdKind::Local);
+
+  // Convert Domain variables to SetDim(Range) variables.
+  copyRel.convertIdKind(IdKind::Domain, 0, getNumIdKind(IdKind::Domain),
+                        IdKind::SetDim);
+
+  // Create an IntegerPolyhedron from this IntegerRelation.
+  // TODO: Can we avoid a copy from this copyRel to this IntegerPolyhedron?
+  //       Maybe a move constructor?
+  IntegerPolyhedron set(copyRel.getSpace());
+  set.append(copyRel);
+  return set;
+}
+
+IntegerPolyhedron IntegerRelation::getRangeSet() {
+  IntegerRelation copyRel = *this;
+
+  // Convert Domain variables to Local variables.
+  copyRel.convertIdKind(IdKind::Domain, 0, getNumIdKind(IdKind::Domain),
+                        IdKind::Local);
+
+  // We do not need to do anything to Range variables since they are already in
+  // SetDim position.
+
+  // Create an IntegerPolyhedron from this IntegerRelation.
+  // TODO: Can we avoid a copy from this copyRel to this IntegerPolyhedron?
+  //       Maybe a move constructor?
+  IntegerPolyhedron set(copyRel.getSpace());
+  set.append(copyRel);
+  return set;
+}
+
 void IntegerRelation::printSpace(raw_ostream &os) const {
   space.print(os);
   os << getNumConstraints() << " constraints\n";
