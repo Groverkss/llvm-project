@@ -1819,26 +1819,26 @@ FailureOr<IntegerRelation> mlir::getRelFromMap(AffineMap &map) {
   // Append range variables.
   rel.appendId(IdKind::Range, map.getNumResults());
 
-  unsigned domainOffset = rel.getIdKindOffset(IdKind::Domain);
+  unsigned rangeOffset = rel.getIdKindOffset(IdKind::Range);
   unsigned symbolOffset = rel.getIdKindOffset(IdKind::Symbol);
 
   // Add equalities between source and range.
   SmallVector<int64_t, 8> eq(rel.getNumCols());
   for (unsigned i = 0, e = rel.getNumIdKind(IdKind::Range); i < e; ++i) {
-    // Copy flatExprs[i][0, domainOffset) to eq[0, domainOffset].
-    std::copy(flatExprs[i].begin(), flatExprs[i].begin() + domainOffset,
+    // Copy flatExprs[i][0, rangeOffset) to eq[0, rangeOffset].
+    std::copy(flatExprs[i].begin(), flatExprs[i].begin() + rangeOffset,
               eq.begin());
 
-    // Copy flatExprs[i][domainOffset, end) to eq[symbolOffset, end].
-    std::copy(flatExprs[i].begin() + domainOffset, flatExprs[i].end(),
+    // Copy flatExprs[i][rangeOffset, end) to eq[symbolOffset, end].
+    std::copy(flatExprs[i].begin() + rangeOffset, flatExprs[i].end(),
               eq.begin() + symbolOffset);
 
     // After the above copies, all positions of equality should be filled except
     // range variables. Fill them with zero.
-    std::fill(eq.begin() + domainOffset, eq.begin() + symbolOffset, 0);
+    std::fill(eq.begin() + rangeOffset, eq.begin() + symbolOffset, 0);
 
     // Add `i = eq` as an equality to rel.
-    eq[rel.getIdKindOffset(IdKind::Range) + i] = -1;
+    eq[rangeOffset + i] = -1;
     rel.addEquality(eq);
   }
 

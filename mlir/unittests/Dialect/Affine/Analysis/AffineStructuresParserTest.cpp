@@ -168,19 +168,24 @@ TEST(ParseFACTest, ParseAndCompareTest) {
 TEST(parseRelTest, ParseAndCompareTest) {
   MLIRContext ctx;
 
-  parseAndCompare("(d0, d1)[] -> (d0 + d1, d1 floordiv 2, d0 + 2 * d1)",
-                  makeRelFromConstraints(2, 3, 0, {},
-                                         {{1, 1, -1, 0, 0, 0, 0},
-                                          {0, 0, 0, -1, 0, 1, 0},
-                                          {1, 2, 0, 0, -1, 0, 0}},
-                                         {{{0, 1, 0, 0, 0, 0}, 2}}),
-                  &ctx);
+  EXPECT_TRUE(
+      parseAndCompare("(d0, d1)[] -> (d0 + d1, d1 floordiv 2, d0 + 2 * d1)",
+                      makeRelFromConstraints(2, 3, 0, {},
+                                             {{1, 1, -1, 0, 0, 0, 0},
+                                              {0, 0, 0, -1, 0, 1, 0},
+                                              {1, 2, 0, 0, -1, 0, 0}},
+                                             {{{0, 1, 0, 0, 0, 0}, 2}}),
+                      &ctx));
 
-  parseAndCompare("(d0)[] -> (d0, 2 * d0, d0 floordiv 5)",
-                  makeRelFromConstraints(1, 3, 0, {},
-                                         {{1, -1, 0, 0, 0, 0},
-                                          {2, 0, -1, 0, 0, 0},
-                                          {0, 0, 0, -1, 1, 0}},
-                                         {{{1, 0, 0, 0, 0}, 5}}),
-                  &ctx);
+  EXPECT_TRUE(parseAndCompare(
+      "(d0)[] -> (d0, 2 * d0, d0 floordiv 5)",
+      makeRelFromConstraints(
+          1, 3, 0, {},
+          {{1, -1, 0, 0, 0, 0}, {2, 0, -1, 0, 0, 0}, {0, 0, 0, -1, 1, 0}},
+          {{{1, 0, 0, 0, 0}, 5}}),
+      &ctx));
+
+  EXPECT_TRUE(parseAndCompare(
+      "(x)[N] -> (x + 10)",
+      makeRelFromConstraints(1, 1, 1, {}, {{1, -1, 0, 10}}, {}), &ctx));
 }
