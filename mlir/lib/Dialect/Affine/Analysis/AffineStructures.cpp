@@ -1803,3 +1803,44 @@ LogicalResult mlir::getRelationFromMap(const AffineValueMap &map,
 
   return success();
 }
+
+FailureOr<IntegerRelation> mlir::getRelFromMap(AffineMap &map) {
+  // Get flattened affine expressions.
+  std::vector<SmallVector<int64_t, 8>> flatExprs;
+  FlatAffineValueConstraints localVarCst;
+  if (failed(getFlattenedAffineExprs(map, &flatExprs, &localVarCst)))
+    return failure();
+
+  // Set dimensions are stored as range variables. Convert these range variables
+  // to domain variables.
+  IntegerRelation rel = localVarCst;
+  rel.convertIdKind(IdKind::Range, 0, rel.getNumIdKind(IdKind::Range),
+                    IdKind::Domain);
+  // Append range variables.
+  rel.appendId(IdKind::Range, map.getNumResults());
+
+  unsigned domainOffset = rel.getIdKindOffset(IdKind::Domain);
+  unsigned symbolOffset = rel.getIdKindOffset(IdKind::Symbol);
+
+  // Add equalities between source and range.
+  SmallVector<int64_t, 8> eq(rel.getNumCols());
+  for (unsigned i = 0, e = rel.getNumIdKind(IdKind::Range); i < e; ++i) {
+    // Copy flatExprs[i][0, domainOffset) to eq[0, domainOffset].
+    std::copy(flatExprs[i].begin(), flatExprs[i].begin() + domainOffset,
+              eq.begin());
+
+    // Copy flatExprs[i][domainOffset, end) to eq[symbolOffset, end].
+    std::copy(flatExprs[i].begin() + domainOffset, flatExprs[i].end(),
+              eq.begin() + symbolOffset);
+
+    // After the above copies, all positions of equality should be filled except
+    // range variables. Fill them with zero.
+    std::fill(eq.begin() + domainOffset, eq.begin() + symbolOffset, 0);
+
+    // Add `i = eq` as an equality to rel.
+    eq[rel.getIdKindOffset(IdKind::Range) + i] = -1;
+    rel.addEquality(eq);
+  }
+
+  return rel;
+}

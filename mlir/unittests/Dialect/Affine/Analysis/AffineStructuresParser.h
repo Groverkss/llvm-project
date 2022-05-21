@@ -24,10 +24,18 @@ namespace mlir {
 /// passed `str` has additional tokens that were not part of the IntegerSet, a
 /// failure is returned. Diagnostics are printed on failure if
 /// `printDiagnosticInfo` is true.
-
 FailureOr<presburger::IntegerPolyhedron>
 parseIntegerSetToFAC(llvm::StringRef, MLIRContext *context,
                      bool printDiagnosticInfo = true);
+
+/// This parses a single AffineMap to an MLIR context and transforms it to
+/// IntegerRelation if it was valid. If not, a failure is returned. If the
+/// passed `str` has additional tokens that were not part of the
+/// IntegerRelation, a failure is returned. Diagnostics are printed on failure
+/// if `printDiagnosticInfo` is true.
+FailureOr<presburger::IntegerRelation>
+parseAffineMapToRel(llvm::StringRef, MLIRContext *context,
+                    bool printDiagnosticInfo = true);
 
 } // namespace mlir
 

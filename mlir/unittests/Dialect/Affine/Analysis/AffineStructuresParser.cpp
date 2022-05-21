@@ -23,3 +23,14 @@ mlir::parseIntegerSetToFAC(llvm::StringRef str, MLIRContext *context,
 
   return FlatAffineValueConstraints(set);
 }
+
+FailureOr<IntegerRelation> mlir::parseAffineMapToRel(llvm::StringRef str,
+                                                     MLIRContext *context,
+                                                     bool printDiagnosticInfo) {
+  AffineMap map = parseAffineMap(str, context, printDiagnosticInfo);
+
+  if (!map)
+    return failure();
+
+  return getRelFromMap(map);
+}

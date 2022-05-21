@@ -246,6 +246,15 @@ Type parseType(llvm::StringRef typeStr, MLIRContext *context, size_t &numRead);
 IntegerSet parseIntegerSet(llvm::StringRef str, MLIRContext *context,
                            bool printDiagnosticInfo = true);
 
+/// This parses a single AffineMap to an MLIR context if it was valid. If not,
+/// an error message is emitted through a new SourceMgrDiagnosticHandler
+/// constructed from a new SourceMgr with a single MemoryBuffer wrapping
+/// `str`. If the passed `str` has additional tokens that were not part of the
+/// AffineMap, a failure is returned. Diagnostics are printed on failure if
+/// `printDiagnosticInfo` is true.
+AffineMap parseAffineMap(llvm::StringRef str, MLIRContext *context,
+                           bool printDiagnosticInfo = true);
+
 } // namespace mlir
 
 #endif // MLIR_PARSER_PARSER_H

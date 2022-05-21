@@ -38,6 +38,25 @@ static IntegerPolyhedron makeFACFromConstraints(
   return fac;
 }
 
+/// Construct a IntegerRelation from a set of inequality, equality, and
+/// division onstraints.
+static IntegerRelation makeRelFromConstraints(
+    unsigned domain, unsigned range, unsigned syms,
+    ArrayRef<SmallVector<int64_t, 4>> ineqs,
+    ArrayRef<SmallVector<int64_t, 4>> eqs = {},
+    ArrayRef<std::pair<SmallVector<int64_t, 4>, int64_t>> divs = {}) {
+  PresburgerSpace space =
+      PresburgerSpace::getRelationSpace(domain, range, syms);
+  IntegerRelation rel(ineqs.size(), eqs.size(), space.getNumIds() + 1, space);
+  for (const auto &div : divs)
+    rel.addLocalFloorDiv(div.first, div.second);
+  for (const auto &eq : eqs)
+    rel.addEquality(eq);
+  for (const auto &ineq : ineqs)
+    rel.addInequality(ineq);
+  return rel;
+}
+
 TEST(ParseFACTest, InvalidInputTest) {
   MLIRContext context;
   FailureOr<IntegerPolyhedron> fac;
@@ -81,6 +100,17 @@ static bool parseAndCompare(StringRef str, const IntegerPolyhedron &ex,
   EXPECT_TRUE(succeeded(fac));
 
   return PresburgerSet(*fac).isEqual(PresburgerSet(ex));
+}
+
+/// Parses and compares the `str` to the `ex`. The equality check is performed
+/// by using PresburgerSet::isEqual
+static bool parseAndCompare(StringRef str, const IntegerRelation &ex,
+                            MLIRContext *context) {
+  FailureOr<IntegerRelation> rel = parseAffineMapToRel(str, context);
+
+  EXPECT_TRUE(succeeded(rel));
+
+  return PresburgerRelation(*rel).isEqual(PresburgerRelation(ex));
 }
 
 TEST(ParseFACTest, ParseAndCompareTest) {
@@ -133,4 +163,24 @@ TEST(ParseFACTest, ParseAndCompareTest) {
       makeFACFromConstraints(2, 0, {}, {{0, 1, 0, -1, 0}},
                              {{{0, 1, 0}, 2}, {{1, 0, 1, 0}, 3}}),
       &context));
+}
+
+TEST(parseRelTest, ParseAndCompareTest) {
+  MLIRContext ctx;
+
+  parseAndCompare("(d0, d1)[] -> (d0 + d1, d1 floordiv 2, d0 + 2 * d1)",
+                  makeRelFromConstraints(2, 3, 0, {},
+                                         {{1, 1, -1, 0, 0, 0, 0},
+                                          {0, 0, 0, -1, 0, 1, 0},
+                                          {1, 2, 0, 0, -1, 0, 0}},
+                                         {{{0, 1, 0, 0, 0, 0}, 2}}),
+                  &ctx);
+
+  parseAndCompare("(d0)[] -> (d0, 2 * d0, d0 floordiv 5)",
+                  makeRelFromConstraints(1, 3, 0, {},
+                                         {{1, -1, 0, 0, 0, 0},
+                                          {2, 0, -1, 0, 0, 0},
+                                          {0, 0, 0, -1, 1, 0}},
+                                         {{{1, 0, 0, 0, 0}, 5}}),
+                  &ctx);
 }

@@ -35,6 +35,16 @@ inline IntegerPolyhedron parsePoly(StringRef str) {
   return *poly;
 }
 
+/// Parses a IntegerPolyhedron from a StringRef. It is expected that the
+/// string represents a valid IntegerSet, otherwise it will violate a gtest
+/// assertion.
+inline IntegerRelation parseMap(StringRef str) {
+  MLIRContext context(MLIRContext::Threading::DISABLED);
+  FailureOr<IntegerRelation> rel = parseAffineMapToRel(str, &context);
+  EXPECT_TRUE(succeeded(rel));
+  return *rel;
+}
+
 /// Parse a list of StringRefs to IntegerRelation and combine them into a
 /// PresburgerSet be using the union operation. It is expected that the strings
 /// are all valid IntegerSet representation and that all of them have the same

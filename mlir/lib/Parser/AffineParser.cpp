@@ -735,3 +735,29 @@ IntegerSet mlir::parseIntegerSet(StringRef inputStr, MLIRContext *context,
 
   return set;
 }
+
+AffineMap mlir::parseAffineMap(StringRef inputStr, MLIRContext *context,
+                               bool printDiagnosticInfo) {
+  llvm::SourceMgr sourceMgr;
+  auto memBuffer = llvm::MemoryBuffer::getMemBuffer(
+      inputStr, /*BufferName=*/"<mlir_parser_buffer>",
+      /*RequiresNullTerminator=*/false);
+  sourceMgr.AddNewSourceBuffer(std::move(memBuffer), SMLoc());
+  SymbolState symbolState;
+  ParserState state(sourceMgr, context, symbolState, /*asmState=*/nullptr);
+  Parser parser(state);
+
+  raw_ostream &os = printDiagnosticInfo ? llvm::errs() : llvm::nulls();
+  SourceMgrDiagnosticHandler handler(sourceMgr, context, os);
+  AffineMap map;
+  if (parser.parseAffineMapReference(map))
+    return AffineMap();
+
+  Token endTok = parser.getToken();
+  if (endTok.isNot(Token::eof)) {
+    parser.emitError(endTok.getLoc(), "encountered unexpected token");
+    return AffineMap();
+  }
+
+  return map;
+}
