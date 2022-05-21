@@ -141,9 +141,7 @@ public:
   }
 
   /// Reset the stored values in space.
-  void resetValues() {
-    space.resetValues();
-  }
+  void resetValues() { space.resetValues(); }
 
   unsigned getNumConstraints() const {
     return getNumInequalities() + getNumEqualities();

@@ -253,7 +253,7 @@ IntegerSet parseIntegerSet(llvm::StringRef str, MLIRContext *context,
 /// AffineMap, a failure is returned. Diagnostics are printed on failure if
 /// `printDiagnosticInfo` is true.
 AffineMap parseAffineMap(llvm::StringRef str, MLIRContext *context,
-                           bool printDiagnosticInfo = true);
+                         bool printDiagnosticInfo = true);
 
 } // namespace mlir
 
