@@ -173,6 +173,17 @@ void PresburgerSpace::setDimSymbolSeparation(unsigned newSymbolCount) {
   // same.
 }
 
+void PresburgerSpace::resetValues() {
+  values.clear();
+  values.resize(getNumDimAndSymbolIds());
+#ifndef NDEBUG
+  types.clear();
+  types.resize(getNumDimAndSymbolIds());
+#endif
+
+  usingValues = true;
+}
+
 void PresburgerSpace::print(llvm::raw_ostream &os) const {
   os << "Domain: " << getNumDomainIds() << ", "
      << "Range: " << getNumRangeIds() << ", "

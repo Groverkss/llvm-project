@@ -195,6 +195,10 @@ public:
     return isCompatible(other) && values == other.values;
   }
 
+  /// Reset the stored values in the space. Enables `usingValues` if it was
+  /// `false` before.
+  void resetValues();
+
 protected:
   PresburgerSpace(unsigned numDomain = 0, unsigned numRange = 0,
                   unsigned numSymbols = 0, unsigned numLocals = 0,
