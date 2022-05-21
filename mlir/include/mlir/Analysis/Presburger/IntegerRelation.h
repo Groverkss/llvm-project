@@ -140,6 +140,11 @@ public:
     return space.getValue<T>(kind, i);
   }
 
+  /// Reset the stored values in space.
+  void resetValues() {
+    space.resetValues();
+  }
+
   unsigned getNumConstraints() const {
     return getNumInequalities() + getNumEqualities();
   }
@@ -516,6 +521,9 @@ public:
 
   /// Return a set corresponding to all points in the range of the relation.
   IntegerPolyhedron getRangeSet();
+
+  /// Get inverse of this relation.
+  void inverse();
 
   void print(raw_ostream &os) const;
   void dump() const;

@@ -27,6 +27,14 @@ static IntegerRelation parseRel(StringRef mapStr, StringRef conditionsStr) {
   return map.intersect(set);
 }
 
+static IntegerRelation parseRelationFromSet(StringRef set, unsigned numDomain) {
+  IntegerRelation rel = parsePoly(set);
+
+  rel.convertIdKind(IdKind::SetDim, 0, numDomain, IdKind::Domain);
+
+  return rel;
+}
+
 TEST(IntegerRelationTest, getDomainAndRangeSet) {
   IntegerRelation rel =
       parseRel("(x)[N] -> (x + 10)", "(x, xr)[N] : (xr >= 0, N - xr >= 0)");
@@ -46,3 +54,17 @@ TEST(IntegerRelationTest, getDomainAndRangeSet) {
   EXPECT_TRUE(rangeSet.isEqual(expectedRangeSet));
 }
 
+TEST(IntegerRelationTest, inverse) {
+  IntegerRelation rel =
+      parseRel("(x, y)[N, M] -> (x + y)",
+               "(x, y, z)[N, M] : (x >= 0, N - x >= 0, y >= 0, M - y >= 0)");
+
+  IntegerRelation inverseRel =
+      parseRelationFromSet("(z, x, y)[N, M]  : (x >= 0, N - x >= 0, y >= 0, M "
+                           "- y >= 0, x + y - z == 0)",
+                           1);
+
+  rel.inverse();
+
+  EXPECT_TRUE(rel.isEqual(inverseRel));
+}
