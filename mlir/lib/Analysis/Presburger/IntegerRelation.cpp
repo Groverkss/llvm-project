@@ -2080,7 +2080,7 @@ void IntegerRelation::removeIndependentConstraints(unsigned pos, unsigned num) {
     removeEquality(nbIndex);
 }
 
-IntegerPolyhedron IntegerRelation::getDomainSet() {
+IntegerPolyhedron IntegerRelation::getDomainSet() const {
   IntegerRelation copyRel = *this;
 
   // Convert Range variables to Local variables.
@@ -2099,7 +2099,7 @@ IntegerPolyhedron IntegerRelation::getDomainSet() {
   return set;
 }
 
-IntegerPolyhedron IntegerRelation::getRangeSet() {
+IntegerPolyhedron IntegerRelation::getRangeSet() const {
   IntegerRelation copyRel = *this;
 
   // Convert Domain variables to Local variables.
@@ -2115,6 +2115,36 @@ IntegerPolyhedron IntegerRelation::getRangeSet() {
   IntegerPolyhedron set(copyRel.getSpace());
   set.append(copyRel);
   return set;
+}
+
+void IntegerRelation::intersectDomain(const IntegerPolyhedron &poly) {
+  assert(getDomainSet().getSpace().isCompatible(poly.getSpace()) &&
+         "Domain set is not compatible with poly");
+
+  // Treating the poly as a relation, convert it from `0 -> R` to `R -> 0`.
+  IntegerRelation rel = poly;
+  rel.convertIdKind(IdKind::Range, 0, getNumIdKind(IdKind::Domain),
+                    IdKind::Domain);
+
+  // Append dummy range variables to make spaces compatible.
+  rel.appendId(IdKind::Range, getNumIdKind(IdKind::Range));
+
+  // Intersect in place.
+  mergeLocalIds(rel);
+  append(rel);
+}
+
+void IntegerRelation::intersectRange(const IntegerPolyhedron &poly) {
+  assert(getRangeSet().getSpace().isCompatible(poly.getSpace()) &&
+         "Range set is not compatible with poly");
+
+  IntegerRelation rel = poly;
+
+  // Append dummy domain variables to make spaces compatible.
+  rel.appendId(IdKind::Domain, getNumIdKind(IdKind::Domain));
+
+  mergeLocalIds(rel);
+  append(rel);
 }
 
 void IntegerRelation::inverse() {

@@ -515,10 +515,16 @@ public:
   }
 
   /// Return a set corresponding to all points in the domain of the relation.
-  IntegerPolyhedron getDomainSet();
+  IntegerPolyhedron getDomainSet() const;
 
   /// Return a set corresponding to all points in the range of the relation.
-  IntegerPolyhedron getRangeSet();
+  IntegerPolyhedron getRangeSet() const;
+
+  /// Intersect the given `poly` with the domain.
+  void intersectDomain(const IntegerPolyhedron &poly);
+
+  /// Intersect the given `poly` with the range.
+  void intersectRange(const IntegerPolyhedron &poly);
 
   /// Get inverse of this relation.
   void inverse();
