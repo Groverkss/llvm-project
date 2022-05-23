@@ -529,6 +529,12 @@ public:
   /// Get inverse of this relation.
   void inverse();
 
+  /// Apply the given `rel` to the domain.
+  void applyDomain(const IntegerRelation &rel);
+
+  /// Apply the given `rel` to the range.
+  void applyRange(const IntegerRelation &rel);
+
   void print(raw_ostream &os) const;
   void dump() const;
 

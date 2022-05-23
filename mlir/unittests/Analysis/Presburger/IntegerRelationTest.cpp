@@ -102,3 +102,29 @@ TEST(IntegerRelationTest, intersectDomainAndRange) {
     EXPECT_TRUE(copyRel.isEqual(expectedRel));
   }
 }
+
+TEST(IntegerRelationTest, applyDomainAndRange) {
+
+  {
+    IntegerRelation map1 = parseMap("(x, y)[N] -> (x + N, y - N)");
+    IntegerRelation map2 = parseMap("(x, y)[N] -> (x + y)");
+
+    map1.applyRange(map2);
+
+    IntegerRelation map3 = parseMap("(x, y)[N] -> (x + y)");
+
+    EXPECT_TRUE(map1.isEqual(map3));
+  }
+
+  {
+    IntegerRelation map1 = parseMap("(x, y)[N] -> (x - N, y + N)");
+    IntegerRelation map2 = parseMap("(x, y)[N] -> (N, N)");
+
+    IntegerRelation map3 =
+        parseRelationFromSet("(x, y, r0, r1)[N] : (x - N == 0, y - N == 0)", 2);
+
+    map1.applyDomain(map2);
+
+    EXPECT_TRUE(map1.isEqual(map3));
+  }
+}

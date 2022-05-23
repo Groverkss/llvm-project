@@ -2153,6 +2153,43 @@ void IntegerRelation::inverse() {
   convertIdKind(IdKind::Range, 0, numRangeIds, IdKind::Domain);
 }
 
+void IntegerRelation::applyRange(const IntegerRelation &rel) {
+  assert(getRangeSet().getSpace().isCompatible(rel.getDomainSet().getSpace()) &&
+         "Range of `this` should be compatible with domain of `rel`");
+
+  IntegerRelation copyRel = rel;
+
+  unsigned rangeIds = getNumIdKind(IdKind::Range);
+  unsigned oldSymbolIds = getNumIdKind(IdKind::Symbol);
+  convertIdKind(IdKind::Range, 0, rangeIds, IdKind::Symbol);
+  copyRel.convertIdKind(IdKind::Domain, 0, rangeIds, IdKind::Symbol);
+
+  appendId(IdKind::Range, copyRel.getNumIdKind(IdKind::Range));
+  intersectRange(copyRel.getRangeSet());
+
+  convertIdKind(IdKind::Symbol, oldSymbolIds, getNumIdKind(IdKind::Symbol),
+                IdKind::Local);
+}
+
+void IntegerRelation::applyDomain(const IntegerRelation &rel) {
+  assert(
+      getDomainSet().getSpace().isCompatible(rel.getDomainSet().getSpace()) &&
+      "Range of `this` should be compatible with domain of `rel`");
+
+  IntegerRelation copyRel = rel;
+
+  unsigned domainIds = getNumIdKind(IdKind::Domain);
+  unsigned oldSymbolIds = getNumIdKind(IdKind::Symbol);
+  convertIdKind(IdKind::Domain, 0, domainIds, IdKind::Symbol);
+  copyRel.convertIdKind(IdKind::Domain, 0, domainIds, IdKind::Symbol);
+
+  appendId(IdKind::Domain, copyRel.getNumIdKind(IdKind::Range));
+  intersectDomain(copyRel.getRangeSet());
+
+  convertIdKind(IdKind::Symbol, oldSymbolIds, getNumIdKind(IdKind::Symbol),
+                IdKind::Local);
+}
+
 void IntegerRelation::printSpace(raw_ostream &os) const {
   space.print(os);
   os << getNumConstraints() << " constraints\n";
