@@ -288,7 +288,7 @@ void IntegerRelation::swapId(unsigned posA, unsigned posB) {
   IdKind kindA = getIdKindAt(posA);
   IdKind kindB = getIdKindAt(posB);
   space.swapId(kindA, kindB, posA - getIdKindOffset(kindA),
-               posB = getIdKindOffset(kindB));
+               posB - getIdKindOffset(kindB));
 }
 
 void IntegerRelation::clearConstraints() {
@@ -2188,6 +2188,51 @@ void IntegerRelation::applyDomain(const IntegerRelation &rel) {
 
   convertIdKind(IdKind::Symbol, oldSymbolIds, getNumIdKind(IdKind::Symbol),
                 IdKind::Local);
+}
+
+void IntegerRelation::mergeAndAlign(IdKind kind, IdKind kindOther,
+                                    IntegerRelation &other) {
+  // TODO: Add asserts to check uniqueness of values.
+
+  // Merge ids: merge ids into `other` first from `this`.
+  unsigned otherOffset = other.getIdKindOffset(kindOther);
+  for (unsigned i = 0, e = getNumIdKind(kind); i < e; ++i) {
+    // Get the position for id in `other` with the same value as id at position
+    // `i` in `this`.
+    unsigned loc = other.space.findId(kindOther, space.atValue(kind, i));
+
+    if (loc == other.getNumIdKind(kindOther)) {
+      // Id was not found.
+      other.insertId(kindOther, i);
+      other.space.atValue(kindOther, i) = space.atValue(kind, i);
+      other.space.atType(kindOther, i) = space.atType(kind, i);
+    } else {
+      // Id was found.
+      other.swapId(otherOffset + i, otherOffset + loc);
+    }
+  }
+
+  // Values that are in `other`, but not in `this`, are added at the end.
+  unsigned startNewIds = getNumIdKind(kind);
+  insertId(kind, startNewIds, other.getNumIdKind(kindOther) - startNewIds);
+  for (unsigned i = startNewIds, e = other.getNumIdKind(kindOther); i < e;
+       ++i) {
+    space.atValue(kind, i) = other.space.atValue(kindOther, i);
+    space.atType(kind, i) = other.space.atType(kindOther, i);
+  }
+
+  assert(getNumIdKind(kind) == other.getNumIdKind(kindOther) &&
+         "expected same number of ids");
+}
+
+void IntegerRelation::mergeAndAlign(IdKind kind, IntegerRelation &other) {
+  mergeAndAlign(kind, kind, other);
+}
+
+void IntegerRelation::mergeAndAlign(IntegerRelation &other) {
+  mergeAndAlign(IdKind::Domain, other);
+  mergeAndAlign(IdKind::Range, other);
+  mergeAndAlign(IdKind::Symbol, other);
 }
 
 void IntegerRelation::printSpace(raw_ostream &os) const {

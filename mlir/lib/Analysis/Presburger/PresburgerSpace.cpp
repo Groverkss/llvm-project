@@ -134,7 +134,7 @@ void PresburgerSpace::swapId(IdKind kindA, IdKind kindB, unsigned posA,
   if (kindA == IdKind::Local) {
     atValue(kindB, posB) = nullptr;
 #ifndef NDEBUG
-    types[getIdKindOffset(kindB) + posB] = TypeID::get<void>();
+    atType(kindB, posB) = TypeID::get<void>();
 #endif
     return;
   }
@@ -142,15 +142,14 @@ void PresburgerSpace::swapId(IdKind kindA, IdKind kindB, unsigned posA,
   if (kindB == IdKind::Local) {
     atValue(kindA, posA) = nullptr;
 #ifndef NDEBUG
-    types[getIdKindOffset(kindB) + posB] = TypeID::get<void>();
+    atType(kindA, posA) = TypeID::get<void>();
 #endif
     return;
   }
 
   std::swap(atValue(kindA, posA), atValue(kindB, posB));
 #ifndef NDEBUG
-  std::swap(types[posA + getIdKindOffset(kindA)],
-            types[posB + getIdKindOffset(kindB)]);
+  std::swap(atType(kindA, posA), atType(kindB, posB));
 #endif
 }
 

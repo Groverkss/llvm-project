@@ -173,6 +173,13 @@ public:
     return values[getIdKindOffset(kind) + i];
   }
 
+  TypeID &atType(IdKind kind, unsigned i) {
+    assert(usingValues && "Cannot access values when `usingValues` is false.");
+    assert(kind != IdKind::Local &&
+           "Values cannot be attached to local identifiers.");
+    return types[getIdKindOffset(kind) + i];
+  }
+
   /// Set the value attached to the `i^th` variable to `value`.
   template <typename T>
   void setValue(IdKind kind, unsigned i, T value) {
@@ -193,6 +200,14 @@ public:
 
   bool isAligned(const PresburgerSpace &other) const {
     return isCompatible(other) && values == other.values;
+  }
+
+  unsigned findId(IdKind kind, void *val) {
+    unsigned i = 0;
+    for (unsigned e = getNumIdKind(kind); i < e; ++i)
+      if (atValue(kind, i) != nullptr && atValue(kind, i) == val)
+        break;
+    return i;
   }
 
   /// Reset the stored values in the space. Enables `usingValues` if it was

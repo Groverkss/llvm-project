@@ -535,6 +535,10 @@ public:
   /// Apply the given `rel` to the range.
   void applyRange(const IntegerRelation &rel);
 
+  void mergeAndAlign(IdKind kind, IdKind kindOther, IntegerRelation &other);
+  void mergeAndAlign(IdKind kind, IntegerRelation &other);
+  void mergeAndAlign(IntegerRelation &other);
+
   void print(raw_ostream &os) const;
   void dump() const;
 

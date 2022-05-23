@@ -128,3 +128,54 @@ TEST(IntegerRelationTest, applyDomainAndRange) {
     EXPECT_TRUE(map1.isEqual(map3));
   }
 }
+
+TEST(IntegerRelationTest, mergeAndAlign) {
+  int values[3] = {0, 1, 2};
+
+  {
+    IntegerRelation map1 =
+        parseRelationFromSet("(x, y)[N, M] : (x - N >= 0, y - N - M >= 0)", 1);
+    IntegerRelation map2 =
+        parseRelationFromSet("(x, y)[K, N] : (x - N >= 0, y - N - K >= 0)", 1);
+    map1.resetValues();
+    map2.resetValues();
+
+    map1.setValue(IdKind::Symbol, 0, &values[0]);
+    map1.setValue(IdKind::Symbol, 1, &values[1]);
+
+    map2.setValue(IdKind::Symbol, 0, &values[2]);
+    map2.setValue(IdKind::Symbol, 1, &values[0]);
+
+    map1.mergeAndAlign(IdKind::Symbol, map2);
+
+    EXPECT_EQ(map1.getNumIdKind(IdKind::Symbol), 3u);
+    EXPECT_EQ(map2.getNumIdKind(IdKind::Symbol), 3u);
+    EXPECT_TRUE(map1.getSpace().isAligned(map2.getSpace()));
+    for (unsigned i = 0; i < 3; ++i)
+      EXPECT_EQ(map1.getValue<int *>(IdKind::Symbol, i), &values[i]);
+  }
+
+  {
+    IntegerRelation map1 = parseRelationFromSet(
+        "(x, y, z)[N, M] : (x - N >= 0, y - N - M >= 0)", 1);
+    IntegerRelation map2 = parseRelationFromSet(
+        "(z, y, x)[K, N, M] : (x - N >= 0, y - N - K >= 0)", 2);
+    map1.resetValues();
+    map2.resetValues();
+
+    map1.setValue(IdKind::Range, 0, &values[0]);
+    map1.setValue(IdKind::Range, 1, &values[1]);
+
+    map2.setValue(IdKind::Domain, 0, &values[1]);
+    map2.setValue(IdKind::Domain, 1, &values[0]);
+
+    map1.mergeAndAlign(IdKind::Range, IdKind::Domain, map2);
+
+    EXPECT_EQ(map1.getNumIdKind(IdKind::Range), 2u);
+    EXPECT_EQ(map2.getNumIdKind(IdKind::Domain), 2u);
+    for (unsigned i = 0; i < 2; ++i)
+      EXPECT_EQ(map1.getValue<int *>(IdKind::Range, i), &values[i]);
+    for (unsigned i = 0; i < 2; ++i)
+      EXPECT_EQ(map2.getValue<int *>(IdKind::Domain, i), &values[i]);
+  }
+}
