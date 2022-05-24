@@ -1804,7 +1804,7 @@ LogicalResult mlir::getRelationFromMap(const AffineValueMap &map,
   return success();
 }
 
-FailureOr<IntegerRelation> mlir::getRelFromMap(AffineMap &map) {
+FailureOr<IntegerRelation> mlir::getRelFromMap(AffineMap map) {
   // Get flattened affine expressions.
   std::vector<SmallVector<int64_t, 8>> flatExprs;
   FlatAffineValueConstraints localVarCst;

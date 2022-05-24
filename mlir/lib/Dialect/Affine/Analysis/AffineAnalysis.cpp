@@ -455,7 +455,7 @@ static void computeDirectionVector(
   }
 }
 
-LogicalResult MemRefAccess::getAccessRelation(FlatAffineRelation &rel) const {
+FailureOr<IntegerRelation> MemRefAccess::getAccessRelation() const {
   // Create set corresponding to domain of access.
   FlatAffineValueConstraints domain;
   if (failed(getOpIndexSet(opInst, &domain)))
@@ -464,32 +464,51 @@ LogicalResult MemRefAccess::getAccessRelation(FlatAffineRelation &rel) const {
   // Get access relation from access map.
   AffineValueMap accessValueMap;
   getAccessMap(&accessValueMap);
-  if (failed(getRelationFromMap(accessValueMap, rel)))
+  FailureOr<IntegerRelation> result =
+      getRelFromMap(accessValueMap.getAffineMap());
+
+  // Check for failure.
+  if (failed(result))
     return failure();
 
-  FlatAffineRelation domainRel(rel.getNumDomainDims(), /*numRangeDims=*/0,
-                               domain);
+  IntegerRelation &rel = *result;
+  rel.resetValues();
 
-  // Merge and align domain ids of `ret` and ids of `domain`. Since the domain
-  // of the access map is a subset of the domain of access, the domain ids of
-  // `ret` are guranteed to be a subset of ids of `domain`.
-  for (unsigned i = 0, e = domain.getNumDimIds(); i < e; ++i) {
-    unsigned loc;
-    if (rel.findId(domain.getValue(i), &loc)) {
-      rel.swapId(i, loc);
-    } else {
-      rel.insertDomainId(i);
-      rel.setValue(i, domain.getValue(i));
-    }
-  }
+  // Set domain values for access relation.
+  for (unsigned i = 0, e = accessValueMap.getNumDims(); i < e; ++i)
+    rel.setValue(IdKind::Domain, i, accessValueMap.getOperand(i).getImpl());
 
-  // Append domain constraints to `rel`.
-  domainRel.appendRangeId(rel.getNumRangeDims());
-  domainRel.mergeSymbolIds(rel);
-  domainRel.mergeLocalIds(rel);
-  rel.append(domainRel);
+  // Set symbol values for access relation.
+  unsigned offset = accessValueMap.getNumDims();
+  for (unsigned i = 0, e = accessValueMap.getNumSymbols(); i < e; ++i)
+    rel.setValue(IdKind::Symbol, i,
+                 accessValueMap.getOperand(i + offset).getImpl());
 
-  return success();
+  IntegerPolyhedron domainPoly = domain;
+  domainPoly.resetValues();
+
+  // Set domain values for access relation.
+  for (unsigned i = 0, e = domain.getNumDimIds(); i < e; ++i)
+    domainPoly.setValue(IdKind::Domain, i, domain.getValue(i).getImpl());
+
+  // Set symbol values for access relation.
+  offset = domain.getNumDimIds();
+  for (unsigned i = 0, e = domain.getNumSymbolIds(); i < e; ++i)
+    domainPoly.setValue(IdKind::Symbol, i,
+                        domain.getValue(i + offset).getImpl());
+
+  // Align symbols of `rel` and `domainPoly`.
+  rel.mergeAndAlign(IdKind::Symbol, domainPoly);
+
+  // Align domain and setdim of `rel` and `domainPoly`. The reason we align
+  // `rel` to `domainPoly` instead of the other way around is `domainPoly` is
+  // built in order of induction variables and will preserve that order.
+  domainPoly.mergeAndAlign(IdKind::SetDim, IdKind::Domain, rel);
+
+  // Intersect domain of `rel` with `domainPoly`.
+  rel.intersectDomain(domainPoly);
+
+  return rel;
 }
 
 // Populates 'accessMap' with composition of AffineApplyOps reachable from

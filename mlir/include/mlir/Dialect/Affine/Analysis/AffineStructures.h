@@ -658,7 +658,7 @@ LogicalResult getRelationFromMap(AffineMap &map, FlatAffineRelation &rel);
 LogicalResult getRelationFromMap(const AffineValueMap &map,
                                  FlatAffineRelation &rel);
 
-FailureOr<presburger::IntegerRelation> getRelFromMap(AffineMap &map);
+FailureOr<presburger::IntegerRelation> getRelFromMap(AffineMap map);
 
 } // namespace mlir.
 
