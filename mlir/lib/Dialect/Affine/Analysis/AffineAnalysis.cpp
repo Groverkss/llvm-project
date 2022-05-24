@@ -528,25 +528,26 @@ void MemRefAccess::getAccessMap(AffineValueMap *accessMap) const {
 
 static FlatAffineValueConstraints
 getFACFromIntegerRelation(IntegerRelation rel) {
- rel.insertId(IdKind::Range, 0, rel.getNumIdKind(IdKind::Domain));
- for (unsigned i = 0, e = rel.getNumIdKind(IdKind::Domain); i < e; ++i)
-   rel.swapId(rel.getIdKindOffset(IdKind::Domain) + i,
-              rel.getIdKindOffset(IdKind::Range) + i);
- rel.removeIdRange(IdKind::Domain, 0, rel.getNumIdKind(IdKind::Domain));
+  rel.insertId(IdKind::Range, 0, rel.getNumIdKind(IdKind::Domain));
+  for (unsigned i = 0, e = rel.getNumIdKind(IdKind::Domain); i < e; ++i)
+    rel.swapId(rel.getIdKindOffset(IdKind::Domain) + i,
+               rel.getIdKindOffset(IdKind::Range) + i);
+  rel.removeIdRange(IdKind::Domain, 0, rel.getNumIdKind(IdKind::Domain));
 
- FlatAffineValueConstraints facv(rel.getRangeSet());
+  FlatAffineValueConstraints facv(rel.getRangeSet());
 
- for (unsigned i = 0, e = rel.getNumIdKind(IdKind::Range); i < e; ++i)
-   if (rel.getSpace().atValue(IdKind::Range, i) != nullptr)
-     facv.setValue(i,
-                  Value(rel.getValue<detail::ValueImpl *>(IdKind::Range, i)));
+  for (unsigned i = 0, e = rel.getNumIdKind(IdKind::Range); i < e; ++i)
+    if (rel.getSpace().atValue(IdKind::Range, i) != nullptr)
+      facv.setValue(i,
+                    Value(rel.getValue<detail::ValueImpl *>(IdKind::Range, i)));
 
- for (unsigned i = 0, e = rel.getNumIdKind(IdKind::Symbol); i < e; ++i)
-   if (rel.getSpace().atValue(IdKind::Symbol, i) != nullptr)
-     facv.setValue(i + facv.getNumDimIds(),
-                  Value(rel.getValue<detail::ValueImpl *>(IdKind::Symbol, i)));
+  for (unsigned i = 0, e = rel.getNumIdKind(IdKind::Symbol); i < e; ++i)
+    if (rel.getSpace().atValue(IdKind::Symbol, i) != nullptr)
+      facv.setValue(
+          i + facv.getNumDimIds(),
+          Value(rel.getValue<detail::ValueImpl *>(IdKind::Symbol, i)));
 
- return facv;
+  return facv;
 }
 
 // Builds a flat affine constraint system to check if there exists a dependence
