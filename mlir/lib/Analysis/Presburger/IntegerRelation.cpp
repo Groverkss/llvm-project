@@ -2167,6 +2167,15 @@ void IntegerRelation::applyRange(const IntegerRelation &rel) {
   appendId(IdKind::Range, copyRel.getNumIdKind(IdKind::Range));
   intersectRange(copyRel.getRangeSet());
 
+  if (space.isUsingValues()) {
+    for (unsigned i = 0, e = getNumIdKind(IdKind::Range); i < e; ++i) {
+      space.atValue(IdKind::Range, i) = copyRel.space.atValue(IdKind::Range, i);
+#ifndef NDEBUG
+      space.atType(IdKind::Range, i) = copyRel.space.atType(IdKind::Range, i);
+#endif
+    }
+  }
+
   convertIdKind(IdKind::Symbol, oldSymbolIds, getNumIdKind(IdKind::Symbol),
                 IdKind::Local);
 }
@@ -2185,6 +2194,16 @@ void IntegerRelation::applyDomain(const IntegerRelation &rel) {
 
   appendId(IdKind::Domain, copyRel.getNumIdKind(IdKind::Range));
   intersectDomain(copyRel.getRangeSet());
+
+  if (space.isUsingValues()) {
+    for (unsigned i = 0, e = getNumIdKind(IdKind::Domain); i < e; ++i) {
+      space.atValue(IdKind::Domain, i) =
+          copyRel.space.atValue(IdKind::Range, i);
+#ifndef NDEBUG
+      space.atType(IdKind::Domain, i) = copyRel.space.atType(IdKind::Range, i);
+#endif
+    }
+  }
 
   convertIdKind(IdKind::Symbol, oldSymbolIds, getNumIdKind(IdKind::Symbol),
                 IdKind::Local);

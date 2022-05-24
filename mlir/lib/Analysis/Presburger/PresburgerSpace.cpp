@@ -194,6 +194,13 @@ void PresburgerSpace::print(llvm::raw_ostream &os) const {
     for (void *value : values)
       os << value << " ";
     os << ")\n";
+
+#ifndef NDEBUG
+    os << "(";
+    for (TypeID type : types)
+      os << type.getAsOpaquePointer() << " ";
+    os << ")\n";
+#endif
   }
 }
 

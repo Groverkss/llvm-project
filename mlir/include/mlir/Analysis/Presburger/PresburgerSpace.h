@@ -210,6 +210,8 @@ public:
     return i;
   }
 
+  bool isUsingValues() const { return usingValues; }
+
   /// Reset the stored values in the space. Enables `usingValues` if it was
   /// `false` before.
   void resetValues();
