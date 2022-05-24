@@ -471,6 +471,14 @@ public:
   /// O(VC) time.
   void removeRedundantConstraints();
 
+  /// Removes local variables using equalities. Each equality is checked if it
+  /// can be reduced to the form: `e = affine-expr`, where `e` is a local
+  /// variable and `affine-expr` is an affine expression not containing `e`.
+  /// If an equality satisfies this form, the local variable is replaced in
+  /// each constraint and then removed. The equality used to replace this local
+  /// variable is also removed.
+  void removeRedundantLocalVars();
+
   void removeDuplicateDivs();
 
   /// Converts identifiers of kind srcKind in the range [idStart, idLimit) to
@@ -560,14 +568,6 @@ protected:
   inline LogicalResult gaussianEliminateId(unsigned position) {
     return success(gaussianEliminateIds(position, position + 1) == 1);
   }
-
-  /// Removes local variables using equalities. Each equality is checked if it
-  /// can be reduced to the form: `e = affine-expr`, where `e` is a local
-  /// variable and `affine-expr` is an affine expression not containing `e`.
-  /// If an equality satisfies this form, the local variable is replaced in
-  /// each constraint and then removed. The equality used to replace this local
-  /// variable is also removed.
-  void removeRedundantLocalVars();
 
   /// Eliminates identifiers from equality and inequality constraints
   /// in column range [posStart, posLimit).
