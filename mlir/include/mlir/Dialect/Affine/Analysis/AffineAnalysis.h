@@ -25,7 +25,6 @@ namespace mlir {
 class AffineApplyOp;
 class AffineForOp;
 class AffineValueMap;
-class FlatAffineRelation;
 class FlatAffineValueConstraints;
 class Operation;
 

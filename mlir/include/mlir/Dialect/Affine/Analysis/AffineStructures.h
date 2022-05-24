@@ -504,84 +504,6 @@ protected:
   SmallVector<Optional<Value>, 8> values;
 };
 
-/// A FlatAffineRelation represents a set of ordered pairs (domain -> range)
-/// where "domain" and "range" are tuples of identifiers. The relation is
-/// represented as a FlatAffineValueConstraints with separation of dimension
-/// identifiers into domain and  range. The identifiers are stored as:
-/// [domainIds, rangeIds, symbolIds, localIds, constant].
-class FlatAffineRelation : public FlatAffineValueConstraints {
-public:
-  FlatAffineRelation(unsigned numReservedInequalities,
-                     unsigned numReservedEqualities, unsigned numReservedCols,
-                     unsigned numDomainDims, unsigned numRangeDims,
-                     unsigned numSymbols, unsigned numLocals,
-                     ArrayRef<Optional<Value>> valArgs = {})
-      : FlatAffineValueConstraints(
-            numReservedInequalities, numReservedEqualities, numReservedCols,
-            numDomainDims + numRangeDims, numSymbols, numLocals, valArgs),
-        numDomainDims(numDomainDims), numRangeDims(numRangeDims) {}
-
-  FlatAffineRelation(unsigned numDomainDims = 0, unsigned numRangeDims = 0,
-                     unsigned numSymbols = 0, unsigned numLocals = 0)
-      : FlatAffineValueConstraints(numDomainDims + numRangeDims, numSymbols,
-                                   numLocals),
-        numDomainDims(numDomainDims), numRangeDims(numRangeDims) {}
-
-  FlatAffineRelation(unsigned numDomainDims, unsigned numRangeDims,
-                     FlatAffineValueConstraints &fac)
-      : FlatAffineValueConstraints(fac), numDomainDims(numDomainDims),
-        numRangeDims(numRangeDims) {}
-
-  FlatAffineRelation(unsigned numDomainDims, unsigned numRangeDims,
-                     IntegerPolyhedron &fac)
-      : FlatAffineValueConstraints(fac), numDomainDims(numDomainDims),
-        numRangeDims(numRangeDims) {}
-
-  /// Returns a set corresponding to the domain/range of the affine relation.
-  FlatAffineValueConstraints getDomainSet() const;
-  FlatAffineValueConstraints getRangeSet() const;
-
-  /// Returns the number of identifiers corresponding to domain/range of
-  /// relation.
-  inline unsigned getNumDomainDims() const { return numDomainDims; }
-  inline unsigned getNumRangeDims() const { return numRangeDims; }
-
-  /// Given affine relation `other: (domainOther -> rangeOther)`, this operation
-  /// takes the composition of `other` on `this: (domainThis -> rangeThis)`.
-  /// The resulting relation represents tuples of the form: `domainOther ->
-  /// rangeThis`.
-  void compose(const FlatAffineRelation &other);
-
-  /// Swap domain and range of the relation.
-  /// `(domain -> range)` is converted to `(range -> domain)`.
-  void inverse();
-
-  /// Insert `num` identifiers of the specified kind after the `pos` identifier
-  /// of that kind. The coefficient columns corresponding to the added
-  /// identifiers are initialized to zero.
-  void insertDomainId(unsigned pos, unsigned num = 1);
-  void insertRangeId(unsigned pos, unsigned num = 1);
-
-  /// Append `num` identifiers of the specified kind after the last identifier
-  /// of that kind. The coefficient columns corresponding to the added
-  /// identifiers are initialized to zero.
-  void appendDomainId(unsigned num = 1);
-  void appendRangeId(unsigned num = 1);
-
-  /// Removes identifiers in the column range [idStart, idLimit), and copies any
-  /// remaining valid data into place, updates member variables, and resizes
-  /// arrays as needed.
-  void removeIdRange(IdKind kind, unsigned idStart, unsigned idLimit) override;
-  using IntegerRelation::removeIdRange;
-
-protected:
-  // Number of dimension identifers corresponding to domain identifers.
-  unsigned numDomainDims;
-
-  // Number of dimension identifers corresponding to range identifers.
-  unsigned numRangeDims;
-};
-
 /// Flattens 'expr' into 'flattenedExpr', which contains the coefficients of the
 /// dimensions, symbols, and additional variables that represent floor divisions
 /// of dimensions, symbols, and in turn other floor divisions.  Returns failure
@@ -638,7 +560,7 @@ AffineMap alignAffineMapWithValues(AffineMap map, ValueRange operands,
                                    ValueRange dims, ValueRange syms,
                                    SmallVector<Value> *newSyms = nullptr);
 
-/// Builds a relation from the given AffineMap/AffineValueMap `map`, containing
+/// Builds a relation from the given AffineMap `map`, containing
 /// all pairs of the form `operands -> result` that satisfy `map`. `rel` is set
 /// to the relation built. For example, give the AffineMap:
 ///
@@ -651,13 +573,8 @@ AffineMap alignAffineMapWithValues(AffineMap map, ValueRange operands,
 ///    1   0   -1   0  1     0     = 0
 ///    0   1    0  -1  -1    0     = 0
 ///
-/// For AffineValueMap, the domain and symbols have Value set corresponding to
-/// the Value in `map`. Returns failure if the AffineMap could not be flattened
-/// (i.e., semi-affine is not yet handled).
-LogicalResult getRelationFromMap(AffineMap &map, FlatAffineRelation &rel);
-LogicalResult getRelationFromMap(const AffineValueMap &map,
-                                 FlatAffineRelation &rel);
-
+/// Returns failure if the AffineMap could not be flattened (i.e., semi-affine
+/// is not yet handled).
 FailureOr<presburger::IntegerRelation> getRelFromMap(AffineMap map);
 
 } // namespace mlir.
