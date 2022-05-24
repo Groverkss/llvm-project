@@ -282,20 +282,23 @@ static LogicalResult getOpIndexSet(Operation *op,
 // Returns the number of outer loop common to 'src/dstDomain'.
 // Loops common to 'src/dst' domains are added to 'commonLoops' if non-null.
 static unsigned
-getNumCommonLoops(const FlatAffineValueConstraints &srcDomain,
-                  const FlatAffineValueConstraints &dstDomain,
+getNumCommonLoops(const IntegerPolyhedron &srcDomain,
+                  const IntegerPolyhedron &dstDomain,
                   SmallVectorImpl<AffineForOp> *commonLoops = nullptr) {
   // Find the number of common loops shared by src and dst accesses.
   unsigned minNumLoops =
       std::min(srcDomain.getNumDimIds(), dstDomain.getNumDimIds());
   unsigned numCommonLoops = 0;
   for (unsigned i = 0; i < minNumLoops; ++i) {
-    if (!isForInductionVar(srcDomain.getValue(i)) ||
-        !isForInductionVar(dstDomain.getValue(i)) ||
-        srcDomain.getValue(i) != dstDomain.getValue(i))
+    auto *valueImplSrc =
+        dstDomain.getValue<detail::ValueImpl *>(IdKind::SetDim, i);
+    auto *valueImplDst =
+        dstDomain.getValue<detail::ValueImpl *>(IdKind::SetDim, i);
+    if (!isForInductionVar(Value(valueImplSrc)) ||
+        !isForInductionVar(Value(valueImplDst)) || valueImplSrc != valueImplDst)
       break;
     if (commonLoops != nullptr)
-      commonLoops->push_back(getForInductionVarOwner(srcDomain.getValue(i)));
+      commonLoops->push_back(getForInductionVarOwner(Value(valueImplSrc)));
     ++numCommonLoops;
   }
   if (commonLoops != nullptr)
@@ -304,13 +307,14 @@ getNumCommonLoops(const FlatAffineValueConstraints &srcDomain,
 }
 
 /// Returns Block common to 'srcAccess.opInst' and 'dstAccess.opInst'.
+/// `commonForIV` is the deepest induction variable common to both `srcAccess`
+/// and `dstAccess`. `commonForIV` does not exist if there are no common loops.
 static Block *getCommonBlock(const MemRefAccess &srcAccess,
                              const MemRefAccess &dstAccess,
-                             const FlatAffineValueConstraints &srcDomain,
-                             unsigned numCommonLoops) {
+                             Optional<Value> commonForIV) {
   // Get the chain of ancestor blocks to the given `MemRefAccess` instance. The
   // search terminates when either an op with the `AffineScope` trait or
-  // `endBlock` is reached.
+  // `endBlock` is reached
   auto getChainOfAncestorBlocks = [&](const MemRefAccess &access,
                                       SmallVector<Block *, 4> &ancestorBlocks,
                                       Block *endBlock = nullptr) {
@@ -324,15 +328,14 @@ static Block *getCommonBlock(const MemRefAccess &srcAccess,
     }
   };
 
-  if (numCommonLoops == 0) {
+  if (!commonForIV) {
     Block *block = srcAccess.opInst->getBlock();
     while (!llvm::isa<func::FuncOp>(block->getParentOp())) {
       block = block->getParentOp()->getBlock();
     }
     return block;
   }
-  Value commonForIV = srcDomain.getValue(numCommonLoops - 1);
-  AffineForOp forOp = getForInductionVarOwner(commonForIV);
+  AffineForOp forOp = getForInductionVarOwner(*commonForIV);
   assert(forOp && "commonForValue was not an induction variable");
 
   // Find the closest common block including those in AffineIf.
@@ -352,15 +355,15 @@ static Block *getCommonBlock(const MemRefAccess &srcAccess,
 // Returns true if the ancestor operation of 'srcAccess' appears before the
 // ancestor operation of 'dstAccess' in the common ancestral block. Returns
 // false otherwise.
+// `commonForIV` is the deepest induction variable common to both `srcAccess`
+// and `dstAccess`. `commonForIV` does not exist if there are no common loops.
 // Note that because 'srcAccess' or 'dstAccess' may be nested in conditionals,
-// the function is named 'srcAppearsBeforeDstInCommonBlock'. Note that
-// 'numCommonLoops' is the number of contiguous surrounding outer loops.
-static bool srcAppearsBeforeDstInAncestralBlock(
-    const MemRefAccess &srcAccess, const MemRefAccess &dstAccess,
-    const FlatAffineValueConstraints &srcDomain, unsigned numCommonLoops) {
+// the function is named 'srcAppearsBeforeDstInCommonBlock'.
+static bool srcAppearsBeforeDstInAncestralBlock(const MemRefAccess &srcAccess,
+                                                const MemRefAccess &dstAccess,
+                                                Optional<Value> commonForIV) {
   // Get Block common to 'srcAccess.opInst' and 'dstAccess.opInst'.
-  auto *commonBlock =
-      getCommonBlock(srcAccess, dstAccess, srcDomain, numCommonLoops);
+  auto *commonBlock = getCommonBlock(srcAccess, dstAccess, commonForIV);
   // Check the dominance relationship between the respective ancestors of the
   // src and dst in the Block of the innermost among the common loops.
   auto *srcInst = commonBlock->findAncestorOpInBlock(*srcAccess.opInst);
@@ -379,25 +382,21 @@ static bool srcAppearsBeforeDstInAncestralBlock(
 // *) If 'loopDepth == 1' then one constraint is added: i' >= i + 1
 // *) If 'loopDepth == 2' then two constraints are added: i == i' and j' > j + 1
 // *) If 'loopDepth == 3' then two constraints are added: i == i' and j == j'
-static void
-addOrderingConstraints(const FlatAffineValueConstraints &srcDomain,
-                       const FlatAffineValueConstraints &dstDomain,
-                       unsigned loopDepth,
-                       FlatAffineValueConstraints *dependenceDomain) {
-  unsigned numCols = dependenceDomain->getNumCols();
+static void addOrderingConstraints(unsigned numCommonLoops, unsigned loopDepth,
+                                   IntegerRelation *dependenceRel) {
+  unsigned numCols = dependenceRel->getNumCols();
   SmallVector<int64_t, 4> eq(numCols);
-  unsigned numSrcDims = srcDomain.getNumDimIds();
-  unsigned numCommonLoops = getNumCommonLoops(srcDomain, dstDomain);
+  unsigned rangeOffset = dependenceRel->getIdKindOffset(IdKind::Range);
   unsigned numCommonLoopConstraints = std::min(numCommonLoops, loopDepth);
   for (unsigned i = 0; i < numCommonLoopConstraints; ++i) {
     std::fill(eq.begin(), eq.end(), 0);
     eq[i] = -1;
-    eq[i + numSrcDims] = 1;
+    eq[i + rangeOffset] = 1;
     if (i == loopDepth - 1) {
       eq[numCols - 1] = -1;
-      dependenceDomain->addInequality(eq);
+      dependenceRel->addInequality(eq);
     } else {
-      dependenceDomain->addEquality(eq);
+      dependenceRel->addEquality(eq);
     }
   }
 }
@@ -407,9 +406,8 @@ addOrderingConstraints(const FlatAffineValueConstraints &srcDomain,
 // eliminating all other variables, and reading off distance vectors from
 // equality constraints (if possible), and direction vectors from inequalities.
 static void computeDirectionVector(
-    const FlatAffineValueConstraints &srcDomain,
-    const FlatAffineValueConstraints &dstDomain, unsigned loopDepth,
-    FlatAffineValueConstraints *dependenceDomain,
+    const IntegerPolyhedron &srcDomain, const IntegerPolyhedron &dstDomain,
+    unsigned loopDepth, FlatAffineValueConstraints *dependenceDomain,
     SmallVector<DependenceComponent, 2> *dependenceComponents) {
   // Find the number of common loops shared by src and dst accesses.
   SmallVector<AffineForOp, 4> commonLoops;
@@ -528,6 +526,29 @@ void MemRefAccess::getAccessMap(AffineValueMap *accessMap) const {
   accessMap->reset(map, operands);
 }
 
+static FlatAffineValueConstraints
+getFACFromIntegerRelation(IntegerRelation rel) {
+ rel.insertId(IdKind::Range, 0, rel.getNumIdKind(IdKind::Domain));
+ for (unsigned i = 0, e = rel.getNumIdKind(IdKind::Domain); i < e; ++i)
+   rel.swapId(rel.getIdKindOffset(IdKind::Domain) + i,
+              rel.getIdKindOffset(IdKind::Range) + i);
+ rel.removeIdRange(IdKind::Domain, 0, rel.getNumIdKind(IdKind::Domain));
+
+ FlatAffineValueConstraints facv(rel.getRangeSet());
+
+ for (unsigned i = 0, e = rel.getNumIdKind(IdKind::Range); i < e; ++i)
+   if (rel.getSpace().atValue(IdKind::Range, i) != nullptr)
+     facv.setValue(i,
+                  Value(rel.getValue<detail::ValueImpl *>(IdKind::Range, i)));
+
+ for (unsigned i = 0, e = rel.getNumIdKind(IdKind::Symbol); i < e; ++i)
+   if (rel.getSpace().atValue(IdKind::Symbol, i) != nullptr)
+     facv.setValue(i + facv.getNumDimIds(),
+                  Value(rel.getValue<detail::ValueImpl *>(IdKind::Symbol, i)));
+
+ return facv;
+}
+
 // Builds a flat affine constraint system to check if there exists a dependence
 // between memref accesses 'srcAccess' and 'dstAccess'.
 // Returns 'NoDependence' if the accesses can be definitively shown not to
@@ -634,25 +655,44 @@ DependenceResult mlir::checkMemrefAccessDependence(
     return DependenceResult::NoDependence;
 
   // Create access relation from each MemRefAccess.
-  FlatAffineRelation srcRel, dstRel;
-  if (failed(srcAccess.getAccessRelation(srcRel)))
+  FailureOr<IntegerRelation> srcResult = srcAccess.getAccessRelation();
+  if (failed(srcResult))
     return DependenceResult::Failure;
-  if (failed(dstAccess.getAccessRelation(dstRel)))
+  FailureOr<IntegerRelation> dstResult = dstAccess.getAccessRelation();
+  if (failed(dstResult))
     return DependenceResult::Failure;
 
-  FlatAffineValueConstraints srcDomain = srcRel.getDomainSet();
-  FlatAffineValueConstraints dstDomain = dstRel.getDomainSet();
+  IntegerRelation &srcRel = *srcResult;
+  IntegerRelation &dstRel = *dstResult;
+
+  srcRel.mergeAndAlign(IdKind::Symbol, dstRel);
+
+  assert(srcRel.getRangeSet().getSpace().isCompatible(
+             dstRel.getRangeSet().getSpace()) &&
+         "Domain set of srcRel and dstRel should be compatible.");
+
+  unsigned numCommonLoops = 0;
+  for (unsigned e = std::min(srcRel.getNumIdKind(IdKind::Domain),
+                             dstRel.getNumIdKind(IdKind::Domain));
+       numCommonLoops < e; ++numCommonLoops)
+    if (srcRel.getValue<detail::ValueImpl *>(IdKind::Domain, numCommonLoops) !=
+        dstRel.getValue<detail::ValueImpl *>(IdKind::Domain, numCommonLoops))
+      break;
+
+  assert(loopDepth <= numCommonLoops + 1);
+
+  Optional<Value> commonForIV(None);
+  if (numCommonLoops != 0)
+    commonForIV = Value(srcRel.getValue<detail::ValueImpl *>(
+        IdKind::Domain, numCommonLoops - 1));
 
   // Return 'NoDependence' if loopDepth > numCommonLoops and if the ancestor
   // operation of 'srcAccess' does not properly dominate the ancestor
   // operation of 'dstAccess' in the same common operation block.
   // Note: this check is skipped if 'allowRAR' is true, because because RAR
   // deps can exist irrespective of lexicographic ordering b/w src and dst.
-  unsigned numCommonLoops = getNumCommonLoops(srcDomain, dstDomain);
-  assert(loopDepth <= numCommonLoops + 1);
   if (!allowRAR && loopDepth > numCommonLoops &&
-      !srcAppearsBeforeDstInAncestralBlock(srcAccess, dstAccess, srcDomain,
-                                           numCommonLoops)) {
+      !srcAppearsBeforeDstInAncestralBlock(srcAccess, dstAccess, commonForIV)) {
     return DependenceResult::NoDependence;
   }
 
@@ -660,22 +700,29 @@ DependenceResult mlir::checkMemrefAccessDependence(
   // `dstRel`. Doing this builds a relation between iteration domain of
   // `srcAccess` to the iteration domain of `dstAccess` which access the same
   // memory locations.
-  dstRel.inverse();
-  dstRel.compose(srcRel);
-  *dependenceConstraints = dstRel;
+  IntegerRelation dependence = srcRel;
+  IntegerRelation dstCopy = dstRel;
+  dstCopy.inverse();
+  dependence.applyRange(dstCopy);
+
+  // We know that there are a lot of equalities with local variables, so use
+  // those to simplify dependence.
+  dependence.removeRedundantLocalVars();
 
   // Add 'src' happens before 'dst' ordering constraints.
-  addOrderingConstraints(srcDomain, dstDomain, loopDepth,
-                         dependenceConstraints);
+  addOrderingConstraints(numCommonLoops, loopDepth, &dependence);
 
   // Return 'NoDependence' if the solution space is empty: no dependence.
-  if (dependenceConstraints->isEmpty())
+  if (dependence.isEmpty())
     return DependenceResult::NoDependence;
+
+  *dependenceConstraints = getFACFromIntegerRelation(dependence);
 
   // Compute dependence direction vector and return true.
   if (dependenceComponents != nullptr)
-    computeDirectionVector(srcDomain, dstDomain, loopDepth,
-                           dependenceConstraints, dependenceComponents);
+    computeDirectionVector(srcRel.getDomainSet(), dstRel.getDomainSet(),
+                           loopDepth, dependenceConstraints,
+                           dependenceComponents);
 
   LLVM_DEBUG(llvm::dbgs() << "Dependence polyhedron:\n");
   LLVM_DEBUG(dependenceConstraints->dump());
