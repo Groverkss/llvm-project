@@ -83,6 +83,10 @@ unsigned PresburgerSpace::insertId(IdKind kind, unsigned pos, unsigned num) {
   else
     numLocals += num;
 
+  // Insert NULL values if `usingValues` and variables inserted are not locals.
+  if (usingValues && kind != IdKind::Local)
+    values.insert(values.begin() + absolutePos, num, nullptr);
+
   return absolutePos;
 }
 
@@ -102,6 +106,33 @@ void PresburgerSpace::removeIdRange(IdKind kind, unsigned idStart,
     numSymbols -= numIdsEliminated;
   else
     numLocals -= numIdsEliminated;
+
+  // Remove values if `usingValues` and variables removed are not locals.
+  if (usingValues && kind != IdKind::Local)
+    values.erase(values.begin() + getIdKindOffset(kind) + idStart,
+                 values.begin() + getIdKindOffset(kind) + idLimit);
+}
+
+void PresburgerSpace::swapId(IdKind kindA, IdKind kindB, unsigned posA,
+                             unsigned posB) {
+
+  if (!usingValues)
+    return;
+
+  if (kindA == IdKind::Local && kindB == IdKind::Local)
+    return;
+
+  if (kindA == IdKind::Local) {
+    atValue(kindB, posB) = nullptr;
+    return;
+  }
+
+  if (kindB == IdKind::Local) {
+    atValue(kindA, posA) = nullptr;
+    return;
+  }
+
+  std::swap(atValue(kindA, posA), atValue(kindB, posB));
 }
 
 bool PresburgerSpace::isCompatible(const PresburgerSpace &other) const {
@@ -114,11 +145,29 @@ bool PresburgerSpace::isEqual(const PresburgerSpace &other) const {
   return isCompatible(other) && getNumLocalIds() == other.getNumLocalIds();
 }
 
+bool PresburgerSpace::isAligned(const PresburgerSpace &other) const {
+  assert(isUsingValues() && other.isUsingValues() &&
+         "Both spaces should be using values to check for "
+         "alignment.");
+  return isCompatible(other) && values == other.values;
+}
+
 void PresburgerSpace::setDimSymbolSeparation(unsigned newSymbolCount) {
   assert(newSymbolCount <= getNumDimAndSymbolIds() &&
          "invalid separation position");
   numRange = numRange + numSymbols - newSymbolCount;
   numSymbols = newSymbolCount;
+  // We do not need to change `values` since the ordering of `values` remains
+  // same.
+}
+
+unsigned PresburgerSpace::findId(IdKind kind, void *val) const {
+  assert(usingValues && "Values are not being used in space.");
+  unsigned i = 0;
+  for (unsigned e = getNumIdKind(kind); i < e; ++i)
+    if (atValue(kind, i) != nullptr && atValue(kind, i) == val)
+      break;
+  return i;
 }
 
 void PresburgerSpace::print(llvm::raw_ostream &os) const {
@@ -126,6 +175,17 @@ void PresburgerSpace::print(llvm::raw_ostream &os) const {
      << "Range: " << getNumRangeIds() << ", "
      << "Symbols: " << getNumSymbolIds() << ", "
      << "Locals: " << getNumLocalIds() << "\n";
+
+  if (usingValues) {
+#ifndef NDEBUG
+    os << "TypeID of values: " << valueType.getAsOpaquePointer() << "\n";
+#endif
+
+    os << "(";
+    for (void *value : values)
+      os << value << " ";
+    os << ")\n";
+  }
 }
 
 void PresburgerSpace::dump() const { print(llvm::errs()); }
