@@ -14,6 +14,8 @@
 #ifndef MLIR_ANALYSIS_PRESBURGER_PRESBURGERSPACE_H
 #define MLIR_ANALYSIS_PRESBURGER_PRESBURGERSPACE_H
 
+#include "mlir/Support/TypeID.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -62,6 +64,11 @@ enum class IdKind { Symbol, Local, Domain, Range, SetDim = Range };
 /// Compatibility of two spaces implies that number of identifiers of each kind
 /// other than Locals are equal. Equality of two spaces implies that number of
 /// identifiers of each kind are equal.
+///
+/// PresburgerSpace optionally also supports attaching values to each variable
+/// in space. `resetValues<ValueType>` enables attaching values to space. All
+/// values must be of same type, which is the type passed as template through
+/// `resetValues<ValueType>`.
 class PresburgerSpace {
 public:
   static PresburgerSpace getRelationSpace(unsigned numDomain = 0,
@@ -119,6 +126,9 @@ public:
   /// idLimit). The range is relative to the kind of identifier.
   void removeIdRange(IdKind kind, unsigned idStart, unsigned idLimit);
 
+  /// TODO: Write doc.
+  void swapId(IdKind kindA, IdKind kindB, unsigned posA, unsigned posB);
+
   /// Returns true if both the spaces are compatible i.e. if both spaces have
   /// the same number of identifiers of each kind (excluding locals).
   bool isCompatible(const PresburgerSpace &other) const;
@@ -136,6 +146,57 @@ public:
 
   void print(llvm::raw_ostream &os) const;
   void dump() const;
+
+  //===--------------------------------------------------------------------===//
+  //     Value Interactions
+  //===--------------------------------------------------------------------===//
+
+  /// Access value attached to `i^th` variable.
+  void *&atValue(IdKind kind, unsigned i) {
+    assert(usingValues && "Cannot access values when `usingValues` is false.");
+    assert(kind != IdKind::Local &&
+           "Values cannot be attached to local identifiers.");
+    return values[getIdKindOffset(kind) + i];
+  }
+  void *atValue(IdKind kind, unsigned i) const {
+    assert(usingValues && "Cannot access values when `usingValues` is false.");
+    assert(kind != IdKind::Local &&
+           "Values cannot be attached to local identifiers.");
+    return values[getIdKindOffset(kind) + i];
+  }
+
+  /// Set the value attached to the `i^th` variable to `value`.
+  template <typename T>
+  void setValue(IdKind kind, unsigned i, T value) {
+    assert(TypeID::get<T>() == valueType && "Type mismatch");
+    atValue(kind, i) = static_cast<void *>(value);
+  }
+
+  /// Get the value attached to the `i^th` variable casted to type `T`.
+  template <typename T>
+  T getValue(IdKind kind, unsigned i) const {
+    assert(TypeID::get<T>() == valueType && "Type mismatch");
+    return static_cast<T>(atValue(kind, i));
+  }
+
+  bool isAligned(const PresburgerSpace &other) const;
+
+  unsigned findId(IdKind kind, void *val) const;
+
+  bool isUsingValues() const { return usingValues; }
+
+  /// Reset the stored values in the space. Enables `usingValues` if it was
+  /// `false` before.
+  template <typename T>
+  void resetValues() {
+    values.clear();
+    values.resize(getNumDimAndSymbolIds());
+#ifndef NDEBUG
+    valueType = TypeID::get<T>();
+#endif
+
+    usingValues = true;
+  }
 
 protected:
   PresburgerSpace(unsigned numDomain = 0, unsigned numRange = 0,
@@ -157,6 +218,16 @@ private:
   /// Number of identifers corresponding to locals (identifiers corresponding
   /// to existentially quantified variables).
   unsigned numLocals;
+
+  /// Stores whether or not values are attached to this space.
+  bool usingValues = false;
+
+#ifndef NDEBUG
+  TypeID valueType;
+#endif
+
+  /// Stores a value for each non-local identifier as a `void` pointer.
+  llvm::SmallVector<void *> values;
 };
 
 } // namespace presburger
