@@ -25,9 +25,12 @@ namespace mlir {
 class AffineApplyOp;
 class AffineForOp;
 class AffineValueMap;
-class FlatAffineRelation;
 class FlatAffineValueConstraints;
 class Operation;
+
+namespace presburger {
+class IntegerRelation;
+} // namespace presburger
 
 /// A description of a (parallelizable) reduction in an affine loop.
 struct LoopReduction {
@@ -113,8 +116,8 @@ struct MemRefAccess {
   ///   0  <= %i1 < 10
   ///
   /// Returns failure for yet unimplemented/unsupported cases (see docs of
-  /// mlir::getIndexSet and mlir::getRelationFromMap for these cases).
-  LogicalResult getAccessRelation(FlatAffineRelation &accessRel) const;
+  /// mlir::getIndexSet and mlir::getRelFromMap for these cases).
+  FailureOr<presburger::IntegerRelation> getAccessRelation() const;
 
   /// Populates 'accessMap' with composition of AffineApplyOps reachable from
   /// 'indices'.
