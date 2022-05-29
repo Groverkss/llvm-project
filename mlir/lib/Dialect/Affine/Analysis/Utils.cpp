@@ -96,7 +96,8 @@ ComputationSliceState::getAsConstraints(FlatAffineValueConstraints *cst) {
   // of fusion and equality constraints for symbols which are constants.
   for (unsigned i = numDims, end = values.size(); i < end; ++i) {
     Value value = values[i];
-    assert(cst->containsId(value) && "value expected to be present");
+    assert(cst->findId(value) < cst->getNumDimAndSymbolIds() &&
+           "value expected to be present");
     if (isValidSymbol(value)) {
       // Check if the symbol is a constant.
       if (auto cOp = value.getDefiningOp<arith::ConstantIndexOp>())

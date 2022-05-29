@@ -261,13 +261,10 @@ public:
                                ArrayRef<Value> operands);
 
   /// Looks up the position of the identifier with the specified Value. Returns
-  /// true if found (false otherwise). `pos` is set to the (column) position of
-  /// the identifier.
-  bool findId(Value val, unsigned *pos) const;
-
-  /// Returns true if an identifier with the specified Value exists, false
-  /// otherwise.
-  bool containsId(Value val) const;
+  /// the index of the first variable that has the specified Value. If no such
+  /// variable, if found, total number of values (total number of dims and
+  /// symbols).
+  unsigned findId(Value val) const;
 
   /// Swap the posA^th identifier with the posB^th identifier.
   void swapId(unsigned posA, unsigned posB) override;
@@ -408,9 +405,6 @@ public:
     assert(pos < getNumDimAndSymbolIds() && "Invalid position");
     return values[pos].hasValue();
   }
-
-  /// Returns true if at least one identifier has an associated Value.
-  bool hasValues() const;
 
   /// Returns the Values associated with identifiers in range [start, end).
   /// Asserts if no Value was associated with one of these identifiers.
