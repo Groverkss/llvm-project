@@ -638,7 +638,7 @@ AffineMap alignAffineMapWithValues(AffineMap map, ValueRange operands,
                                    ValueRange dims, ValueRange syms,
                                    SmallVector<Value> *newSyms = nullptr);
 
-/// Builds a relation from the given AffineMap/AffineValueMap `map`, containing
+/// Builds a relation from the given AffineMap `map`, containing
 /// all pairs of the form `operands -> result` that satisfy `map`. `rel` is set
 /// to the relation built. For example, give the AffineMap:
 ///
@@ -651,12 +651,9 @@ AffineMap alignAffineMapWithValues(AffineMap map, ValueRange operands,
 ///    1   0   -1   0  1     0     = 0
 ///    0   1    0  -1  -1    0     = 0
 ///
-/// For AffineValueMap, the domain and symbols have Value set corresponding to
-/// the Value in `map`. Returns failure if the AffineMap could not be flattened
-/// (i.e., semi-affine is not yet handled).
-LogicalResult getRelationFromMap(AffineMap &map, FlatAffineRelation &rel);
-LogicalResult getRelationFromMap(const AffineValueMap &map,
-                                 FlatAffineRelation &rel);
+/// Returns failure if the AffineMap could not be flattened (i.e., semi-affine
+/// is not yet handled).
+FailureOr<presburger::IntegerRelation> getRelFromMap(AffineMap map);
 
 } // namespace mlir.
 

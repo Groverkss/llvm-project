@@ -1751,55 +1751,43 @@ void FlatAffineRelation::removeIdRange(IdKind kind, unsigned idStart,
     numRangeDims -= intersectRangeLHS - intersectRangeRHS;
 }
 
-LogicalResult mlir::getRelationFromMap(AffineMap &map,
-                                       FlatAffineRelation &rel) {
+FailureOr<IntegerRelation> mlir::getRelFromMap(AffineMap map) {
   // Get flattened affine expressions.
   std::vector<SmallVector<int64_t, 8>> flatExprs;
   FlatAffineValueConstraints localVarCst;
   if (failed(getFlattenedAffineExprs(map, &flatExprs, &localVarCst)))
     return failure();
 
-  unsigned oldDimNum = localVarCst.getNumDimIds();
-  unsigned oldCols = localVarCst.getNumCols();
-  unsigned numRangeIds = map.getNumResults();
-  unsigned numDomainIds = map.getNumDims();
+  // Set dimensions are stored as range variables. Convert these range variables
+  // to domain variables.
+  IntegerRelation rel = localVarCst;
+  rel.convertIdKind(IdKind::Range, 0, rel.getNumIdKind(IdKind::Range),
+                    IdKind::Domain);
+  // Append range variables.
+  rel.appendId(IdKind::Range, map.getNumResults());
 
-  // Add range as the new expressions.
-  localVarCst.appendDimId(numRangeIds);
+  unsigned rangeOffset = rel.getIdKindOffset(IdKind::Range);
+  unsigned symbolOffset = rel.getIdKindOffset(IdKind::Symbol);
 
   // Add equalities between source and range.
-  SmallVector<int64_t, 8> eq(localVarCst.getNumCols());
-  for (unsigned i = 0, e = map.getNumResults(); i < e; ++i) {
-    // Zero fill.
-    std::fill(eq.begin(), eq.end(), 0);
-    // Fill equality.
-    for (unsigned j = 0, f = oldDimNum; j < f; ++j)
-      eq[j] = flatExprs[i][j];
-    for (unsigned j = oldDimNum, f = oldCols; j < f; ++j)
-      eq[j + numRangeIds] = flatExprs[i][j];
-    // Set this dimension to -1 to equate lhs and rhs and add equality.
-    eq[numDomainIds + i] = -1;
-    localVarCst.addEquality(eq);
+  SmallVector<int64_t, 8> eq(rel.getNumCols());
+  for (unsigned i = 0, e = rel.getNumIdKind(IdKind::Range); i < e; ++i) {
+    // Copy flatExprs[i][0, rangeOffset) to eq[0, rangeOffset].
+    std::copy(flatExprs[i].begin(), flatExprs[i].begin() + rangeOffset,
+              eq.begin());
+
+    // Copy flatExprs[i][rangeOffset, end) to eq[symbolOffset, end].
+    std::copy(flatExprs[i].begin() + rangeOffset, flatExprs[i].end(),
+              eq.begin() + symbolOffset);
+
+    // After the above copies, all positions of equality should be filled except
+    // range variables. Fill them with zero.
+    std::fill(eq.begin() + rangeOffset, eq.begin() + symbolOffset, 0);
+
+    // Add `i = eq` as an equality to rel.
+    eq[rangeOffset + i] = -1;
+    rel.addEquality(eq);
   }
 
-  // Create relation and return success.
-  rel = FlatAffineRelation(numDomainIds, numRangeIds, localVarCst);
-  return success();
-}
-
-LogicalResult mlir::getRelationFromMap(const AffineValueMap &map,
-                                       FlatAffineRelation &rel) {
-
-  AffineMap affineMap = map.getAffineMap();
-  if (failed(getRelationFromMap(affineMap, rel)))
-    return failure();
-
-  // Set symbol values for domain dimensions and symbols.
-  for (unsigned i = 0, e = rel.getNumDomainDims(); i < e; ++i)
-    rel.setValue(i, map.getOperand(i));
-  for (unsigned i = rel.getNumDimIds(), e = rel.getNumDimAndSymbolIds(); i < e;
-       ++i)
-    rel.setValue(i, map.getOperand(i - rel.getNumRangeDims()));
-
-  return success();
+  return rel;
 }
