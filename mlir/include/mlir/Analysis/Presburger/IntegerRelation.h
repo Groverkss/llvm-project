@@ -128,6 +128,24 @@ public:
   }
   inline int64_t &atIneq(unsigned i, unsigned j) { return inequalities(i, j); }
 
+  /// Set the value attached to the `i^th` variable to `value`.
+  template <typename T>
+  void setValue(IdKind kind, unsigned i, T value) {
+    space.setValue<T>(kind, i, value);
+  }
+
+  /// Get the value attached to the `i^th` variable casted to type `T`.
+  template <typename T>
+  T getValue(IdKind kind, unsigned i) const {
+    return space.getValue<T>(kind, i);
+  }
+
+  /// Reset the stored values in space.
+  template <typename T>
+  void resetValues() {
+    space.resetValues<T>();
+  }
+
   unsigned getNumConstraints() const {
     return getNumInequalities() + getNumEqualities();
   }
@@ -456,6 +474,14 @@ public:
   /// O(VC) time.
   void removeRedundantConstraints();
 
+  /// Removes local variables using equalities. Each equality is checked if it
+  /// can be reduced to the form: `e = affine-expr`, where `e` is a local
+  /// variable and `affine-expr` is an affine expression not containing `e`.
+  /// If an equality satisfies this form, the local variable is replaced in
+  /// each constraint and then removed. The equality used to replace this local
+  /// variable is also removed.
+  void removeRedundantLocalVars();
+
   void removeDuplicateDivs();
 
   /// Converts identifiers of kind srcKind in the range [idStart, idLimit) to
@@ -555,6 +581,10 @@ public:
   /// this for uniformity with `applyDomain`.
   void applyRange(const IntegerRelation &rel);
 
+  void mergeAndAlign(IdKind kind, IdKind kindOther, IntegerRelation &other);
+  void mergeAndAlign(IdKind kind, IntegerRelation &other);
+  void mergeAndAlign(IntegerRelation &other);
+
   void print(raw_ostream &os) const;
   void dump() const;
 
@@ -576,14 +606,6 @@ protected:
   inline LogicalResult gaussianEliminateId(unsigned position) {
     return success(gaussianEliminateIds(position, position + 1) == 1);
   }
-
-  /// Removes local variables using equalities. Each equality is checked if it
-  /// can be reduced to the form: `e = affine-expr`, where `e` is a local
-  /// variable and `affine-expr` is an affine expression not containing `e`.
-  /// If an equality satisfies this form, the local variable is replaced in
-  /// each constraint and then removed. The equality used to replace this local
-  /// variable is also removed.
-  void removeRedundantLocalVars();
 
   /// Eliminates identifiers from equality and inequality constraints
   /// in column range [posStart, posLimit).
