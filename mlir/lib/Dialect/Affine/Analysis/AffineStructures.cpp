@@ -320,12 +320,6 @@ unsigned FlatAffineValueConstraints::insertId(IdKind kind, unsigned pos,
   return absolutePos;
 }
 
-bool FlatAffineValueConstraints::hasValues() const {
-  return llvm::find_if(values, [](Optional<Value> id) {
-           return id.hasValue();
-         }) != values.end();
-}
-
 /// Checks if two constraint systems are in the same space, i.e., if they are
 /// associated with the same set of identifiers, appearing in the same order.
 static bool areIdsAligned(const FlatAffineValueConstraints &a,
@@ -414,8 +408,8 @@ static void mergeAndAlignIds(unsigned offset, FlatAffineValueConstraints *a,
     // Merge dims from A into B.
     unsigned d = offset;
     for (auto aDimValue : aDimValues) {
-      unsigned loc;
-      if (b->findId(aDimValue, &loc)) {
+      unsigned loc = b->findId(aDimValue);
+      if (loc < b->getNumDimAndSymbolIds()) {
         assert(loc >= offset && "A's dim appears in B's aligned range");
         assert(loc < b->getNumDimIds() &&
                "A's dim appears in B's non-dim position");
@@ -506,9 +500,8 @@ LogicalResult FlatAffineValueConstraints::composeMatchingMap(AffineMap other) {
 
 // Turn a symbol into a dimension.
 static void turnSymbolIntoDim(FlatAffineValueConstraints *cst, Value id) {
-  unsigned pos;
-  if (cst->findId(id, &pos) && pos >= cst->getNumDimIds() &&
-      pos < cst->getNumDimAndSymbolIds()) {
+  unsigned pos = cst->findId(id);
+  if (pos >= cst->getNumDimIds() && pos < cst->getNumDimAndSymbolIds()) {
     cst->swapId(pos, cst->getNumDimIds());
     cst->setDimSymbolSeparation(cst->getNumSymbolIds() - 1);
   }
@@ -530,11 +523,10 @@ void FlatAffineValueConstraints::mergeSymbolIds(
   // Merge symbols: merge symbols into `other` first from `this`.
   unsigned s = other.getNumDimIds();
   for (Value aSymValue : aSymValues) {
-    unsigned loc;
+    unsigned loc = other.findId(aSymValue);
     // If the id is a symbol in `other`, then align it, otherwise assume that
-    // it is a new symbol
-    if (other.findId(aSymValue, &loc) && loc >= other.getNumDimIds() &&
-        loc < other.getNumDimAndSymbolIds())
+    // it is a new symbol.
+    if (loc >= other.getNumDimIds() && loc < other.getNumDimAndSymbolIds())
       other.swapId(s, loc);
     else
       other.insertSymbolId(s - other.getNumDimIds(), aSymValue);
@@ -568,7 +560,7 @@ void FlatAffineValueConstraints::convertLoopIVSymbolsToDims() {
 }
 
 void FlatAffineValueConstraints::addInductionVarOrTerminalSymbol(Value val) {
-  if (containsId(val))
+  if (findId(val) < getNumDimAndSymbolIds())
     return;
 
   // Caller is expected to fully compose map/operands if necessary.
@@ -591,9 +583,9 @@ void FlatAffineValueConstraints::addInductionVarOrTerminalSymbol(Value val) {
 
 LogicalResult
 FlatAffineValueConstraints::addAffineForOpDomain(AffineForOp forOp) {
-  unsigned pos;
+  unsigned pos = findId(forOp.getInductionVar());
   // Pre-condition for this method.
-  if (!findId(forOp.getInductionVar(), &pos)) {
+  if (pos >= getNumDimAndSymbolIds()) {
     assert(false && "Value not found");
     return failure();
   }
@@ -1291,8 +1283,8 @@ LogicalResult FlatAffineValueConstraints::addSliceBounds(
   assert(lbMaps.size() == ubMaps.size());
 
   for (unsigned i = 0, e = lbMaps.size(); i < e; ++i) {
-    unsigned pos;
-    if (!findId(values[i], &pos))
+    unsigned pos = findId(values[i]);
+    if (pos >= getNumDimAndSymbolIds())
       continue;
 
     AffineMap lbMap = lbMaps[i];
@@ -1327,22 +1319,14 @@ LogicalResult FlatAffineValueConstraints::addSliceBounds(
   return success();
 }
 
-bool FlatAffineValueConstraints::findId(Value val, unsigned *pos) const {
+unsigned FlatAffineValueConstraints::findId(Value val) const {
   unsigned i = 0;
   for (const auto &mayBeId : values) {
-    if (mayBeId.hasValue() && mayBeId.getValue() == val) {
-      *pos = i;
-      return true;
-    }
+    if (mayBeId.hasValue() && mayBeId.getValue() == val)
+      return i;
     i++;
   }
-  return false;
-}
-
-bool FlatAffineValueConstraints::containsId(Value val) const {
-  return llvm::any_of(values, [&](const Optional<Value> &mayBeId) {
-    return mayBeId.hasValue() && mayBeId.getValue() == val;
-  });
+  return i;
 }
 
 void FlatAffineValueConstraints::swapId(unsigned posA, unsigned posB) {
@@ -1362,8 +1346,8 @@ void FlatAffineValueConstraints::swapId(unsigned posA, unsigned posB) {
 
 void FlatAffineValueConstraints::addBound(BoundType type, Value val,
                                           int64_t value) {
-  unsigned pos;
-  if (!findId(val, &pos))
+  unsigned pos = findId(val);
+  if (pos >= getNumDimAndSymbolIds())
     // This is a pre-condition for this method.
     assert(0 && "id not found");
   addBound(type, pos, value);
@@ -1411,10 +1395,8 @@ void FlatAffineValueConstraints::fourierMotzkinEliminate(
 }
 
 void FlatAffineValueConstraints::projectOut(Value val) {
-  unsigned pos;
-  bool ret = findId(val, &pos);
-  assert(ret);
-  (void)ret;
+  unsigned pos = findId(val);
+  assert(pos < getNumDimAndSymbolIds() && "No value found");
   fourierMotzkinEliminate(pos);
 }
 
