@@ -152,6 +152,21 @@ bool PresburgerSpace::isAligned(const PresburgerSpace &other) const {
   return isCompatible(other) && values == other.values;
 }
 
+bool PresburgerSpace::isAligned(const PresburgerSpace &other,
+                                IdKind kind) const {
+  assert(isUsingValues() && other.isUsingValues() &&
+         "Both spaces should be using values to check for "
+         "alignment.");
+
+  ArrayRef<void *> kindValues = {values.data() + getIdKindOffset(kind),
+                                 values.data() + getIdKindEnd(kind)};
+  ArrayRef<void *> otherKindValues = {
+      other.values.data() + other.getIdKindOffset(kind),
+      other.values.data() + other.getIdKindEnd(kind)};
+
+  return kindValues == otherKindValues;
+}
+
 void PresburgerSpace::setDimSymbolSeparation(unsigned newSymbolCount) {
   assert(newSymbolCount <= getNumDimAndSymbolIds() &&
          "invalid separation position");

@@ -156,8 +156,7 @@ FlatAffineValueConstraints::FlatAffineValueConstraints(IntegerSet set)
                                                      set.getNumSymbols(),
                                                      /*numLocals=*/0)) {
 
-  // Resize values.
-  values.resize(getNumDimAndSymbolIds(), None);
+  resetValues<detail::ValueImpl *>();
 
   // Flatten expressions and add them to the constraint system.
   std::vector<SmallVector<int64_t, 8>> flatExprs;
@@ -292,18 +291,6 @@ unsigned FlatAffineValueConstraints::insertSymbolId(unsigned pos,
 }
 
 unsigned FlatAffineValueConstraints::insertId(IdKind kind, unsigned pos,
-                                              unsigned num) {
-  unsigned absolutePos = IntegerPolyhedron::insertId(kind, pos, num);
-
-  if (kind != IdKind::Local) {
-    values.insert(values.begin() + absolutePos, num, None);
-    assert(values.size() == getNumDimAndSymbolIds());
-  }
-
-  return absolutePos;
-}
-
-unsigned FlatAffineValueConstraints::insertId(IdKind kind, unsigned pos,
                                               ValueRange vals) {
   assert(!vals.empty() && "expected ValueRange with Values.");
   assert(kind != IdKind::Local &&
@@ -313,28 +300,9 @@ unsigned FlatAffineValueConstraints::insertId(IdKind kind, unsigned pos,
 
   // If a Value is provided, insert it; otherwise use None.
   for (unsigned i = 0; i < num; ++i)
-    values.insert(values.begin() + absolutePos + i,
-                  vals[i] ? Optional<Value>(vals[i]) : None);
+    setValue(absolutePos + i, vals[i]);
 
-  assert(values.size() == getNumDimAndSymbolIds());
   return absolutePos;
-}
-
-/// Checks if two constraint systems are in the same space, i.e., if they are
-/// associated with the same set of identifiers, appearing in the same order.
-static bool areIdsAligned(const FlatAffineValueConstraints &a,
-                          const FlatAffineValueConstraints &b) {
-  return a.getNumDimIds() == b.getNumDimIds() &&
-         a.getNumSymbolIds() == b.getNumSymbolIds() &&
-         a.getNumIds() == b.getNumIds() &&
-         a.getMaybeValues().equals(b.getMaybeValues());
-}
-
-/// Calls areIdsAligned to check if two constraint systems have the same set
-/// of identifiers in the same order.
-bool FlatAffineValueConstraints::areIdsAlignedWithOther(
-    const FlatAffineValueConstraints &other) {
-  return areIdsAligned(*this, other);
 }
 
 /// Checks if the SSA values associated with `cst`'s identifiers in range
@@ -349,13 +317,10 @@ static bool LLVM_ATTRIBUTE_UNUSED areIdsUnique(
   if (start >= end)
     return true;
 
-  SmallPtrSet<Value, 8> uniqueIds;
-  ArrayRef<Optional<Value>> maybeValues =
-      cst.getMaybeValues().slice(start, end - start);
-  for (Optional<Value> val : maybeValues) {
-    if (val.hasValue() && !uniqueIds.insert(val.getValue()).second)
+  SmallPtrSet<void *, 8> uniqueIds;
+  for (unsigned i = start; i < end; ++i)
+    if (cst.hasValue(i) && !uniqueIds.insert(cst.atValue(i)).second)
       return false;
-  }
   return true;
 }
 
@@ -375,70 +340,6 @@ areIdsUnique(const FlatAffineValueConstraints &cst, IdKind kind) {
   if (kind == IdKind::Symbol)
     return areIdsUnique(cst, cst.getNumDimIds(), cst.getNumDimAndSymbolIds());
   llvm_unreachable("Unexpected IdKind");
-}
-
-/// Merge and align the identifiers of A and B starting at 'offset', so that
-/// both constraint systems get the union of the contained identifiers that is
-/// dimension-wise and symbol-wise unique; both constraint systems are updated
-/// so that they have the union of all identifiers, with A's original
-/// identifiers appearing first followed by any of B's identifiers that didn't
-/// appear in A. Local identifiers in B that have the same division
-/// representation as local identifiers in A are merged into one.
-//  E.g.: Input: A has ((%i, %j) [%M, %N]) and B has (%k, %j) [%P, %N, %M])
-//        Output: both A, B have (%i, %j, %k) [%M, %N, %P]
-static void mergeAndAlignIds(unsigned offset, FlatAffineValueConstraints *a,
-                             FlatAffineValueConstraints *b) {
-  assert(offset <= a->getNumDimIds() && offset <= b->getNumDimIds());
-  // A merge/align isn't meaningful if a cst's ids aren't distinct.
-  assert(areIdsUnique(*a) && "A's values aren't unique");
-  assert(areIdsUnique(*b) && "B's values aren't unique");
-
-  assert(std::all_of(a->getMaybeValues().begin() + offset,
-                     a->getMaybeValues().end(),
-                     [](Optional<Value> id) { return id.hasValue(); }));
-
-  assert(std::all_of(b->getMaybeValues().begin() + offset,
-                     b->getMaybeValues().end(),
-                     [](Optional<Value> id) { return id.hasValue(); }));
-
-  SmallVector<Value, 4> aDimValues;
-  a->getValues(offset, a->getNumDimIds(), &aDimValues);
-
-  {
-    // Merge dims from A into B.
-    unsigned d = offset;
-    for (auto aDimValue : aDimValues) {
-      unsigned loc = b->findId(aDimValue);
-      if (loc < b->getNumDimAndSymbolIds()) {
-        assert(loc >= offset && "A's dim appears in B's aligned range");
-        assert(loc < b->getNumDimIds() &&
-               "A's dim appears in B's non-dim position");
-        b->swapId(d, loc);
-      } else {
-        b->insertDimId(d, aDimValue);
-      }
-      d++;
-    }
-    // Dimensions that are in B, but not in A, are added at the end.
-    for (unsigned t = a->getNumDimIds(), e = b->getNumDimIds(); t < e; t++) {
-      a->appendDimId(b->getValue(t));
-    }
-    assert(a->getNumDimIds() == b->getNumDimIds() &&
-           "expected same number of dims");
-  }
-
-  // Merge and align symbols of A and B
-  a->mergeSymbolIds(*b);
-  // Merge and align local ids of A and B
-  a->mergeLocalIds(*b);
-
-  assert(areIdsAligned(*a, *b) && "IDs expected to be aligned");
-}
-
-// Call 'mergeAndAlignIds' to align constraint systems of 'this' and 'other'.
-void FlatAffineValueConstraints::mergeAndAlignIdsWithOther(
-    unsigned offset, FlatAffineValueConstraints *other) {
-  mergeAndAlignIds(offset, this, other);
 }
 
 LogicalResult
@@ -505,44 +406,6 @@ static void turnSymbolIntoDim(FlatAffineValueConstraints *cst, Value id) {
     cst->swapId(pos, cst->getNumDimIds());
     cst->setDimSymbolSeparation(cst->getNumSymbolIds() - 1);
   }
-}
-
-/// Merge and align symbols of `this` and `other` such that both get union of
-/// of symbols that are unique. Symbols in `this` and `other` should be
-/// unique. Symbols with Value as `None` are considered to be inequal to all
-/// other symbols.
-void FlatAffineValueConstraints::mergeSymbolIds(
-    FlatAffineValueConstraints &other) {
-
-  assert(areIdsUnique(*this, IdKind::Symbol) && "Symbol ids are not unique");
-  assert(areIdsUnique(other, IdKind::Symbol) && "Symbol ids are not unique");
-
-  SmallVector<Value, 4> aSymValues;
-  getValues(getNumDimIds(), getNumDimAndSymbolIds(), &aSymValues);
-
-  // Merge symbols: merge symbols into `other` first from `this`.
-  unsigned s = other.getNumDimIds();
-  for (Value aSymValue : aSymValues) {
-    unsigned loc = other.findId(aSymValue);
-    // If the id is a symbol in `other`, then align it, otherwise assume that
-    // it is a new symbol.
-    if (loc >= other.getNumDimIds() && loc < other.getNumDimAndSymbolIds())
-      other.swapId(s, loc);
-    else
-      other.insertSymbolId(s - other.getNumDimIds(), aSymValue);
-    s++;
-  }
-
-  // Symbols that are in other, but not in this, are added at the end.
-  for (unsigned t = other.getNumDimIds() + getNumSymbolIds(),
-                e = other.getNumDimAndSymbolIds();
-       t < e; t++)
-    insertSymbolId(getNumSymbolIds(), other.getValue(t));
-
-  assert(getNumSymbolIds() == other.getNumSymbolIds() &&
-         "expected same number of symbols");
-  assert(areIdsUnique(*this, IdKind::Symbol) && "Symbol ids are not unique");
-  assert(areIdsUnique(other, IdKind::Symbol) && "Symbol ids are not unique");
 }
 
 // Changes all symbol identifiers which are loop IVs to dim identifiers.
@@ -694,24 +557,9 @@ void FlatAffineValueConstraints::addAffineIfOpDomain(AffineIfOp ifOp) {
   // Merge the constraints from ifOp to the current domain. We need first merge
   // and align the IDs from both constraints, and then append the constraints
   // from the ifOp into the current one.
-  mergeAndAlignIdsWithOther(0, &cst);
+  mergeAndAlign(cst);
+  mergeLocalIds(cst);
   append(cst);
-}
-
-bool FlatAffineValueConstraints::hasConsistentState() const {
-  return IntegerPolyhedron::hasConsistentState() &&
-         values.size() == getNumDimAndSymbolIds();
-}
-
-void FlatAffineValueConstraints::removeIdRange(IdKind kind, unsigned idStart,
-                                               unsigned idLimit) {
-  IntegerPolyhedron::removeIdRange(kind, idStart, idLimit);
-  unsigned offset = getIdKindOffset(kind);
-
-  if (kind != IdKind::Local) {
-    values.erase(values.begin() + idStart + offset,
-                 values.begin() + idLimit + offset);
-  }
 }
 
 // Determine whether the identifier at 'pos' (say id_r) can be expressed as
@@ -1237,11 +1085,11 @@ FlatAffineValueConstraints::computeAlignedMap(AffineMap map,
   for (unsigned i = getIdKindOffset(IdKind::SetDim),
                 e = getIdKindEnd(IdKind::SetDim);
        i < e; ++i)
-    dims.push_back(values[i] ? *values[i] : Value());
+    dims.push_back(hasValue(i) ? getValue(i) : Value());
   for (unsigned i = getIdKindOffset(IdKind::Symbol),
                 e = getIdKindEnd(IdKind::Symbol);
        i < e; ++i)
-    syms.push_back(values[i] ? *values[i] : Value());
+    syms.push_back(hasValue(i) ? getValue(i) : Value());
 
   AffineMap alignedMap =
       alignAffineMapWithValues(map, operands, dims, syms, newSymsPtr);
@@ -1320,28 +1168,11 @@ LogicalResult FlatAffineValueConstraints::addSliceBounds(
 }
 
 unsigned FlatAffineValueConstraints::findId(Value val) const {
-  unsigned i = 0;
-  for (const auto &mayBeId : values) {
-    if (mayBeId.hasValue() && mayBeId.getValue() == val)
-      return i;
-    i++;
-  }
+  unsigned i, e;
+  for (i = 0, e = getNumDimAndSymbolIds(); i < e; ++i)
+    if (hasValue(i) && getValue(i) == val)
+      break;
   return i;
-}
-
-void FlatAffineValueConstraints::swapId(unsigned posA, unsigned posB) {
-  IntegerPolyhedron::swapId(posA, posB);
-
-  if (getIdKindAt(posA) == IdKind::Local && getIdKindAt(posB) == IdKind::Local)
-    return;
-
-  // Treat value of a local identifer as None.
-  if (getIdKindAt(posA) == IdKind::Local)
-    values[posB] = None;
-  else if (getIdKindAt(posB) == IdKind::Local)
-    values[posA] = None;
-  else
-    std::swap(values[posA], values[posB]);
 }
 
 void FlatAffineValueConstraints::addBound(BoundType type, Value val,
@@ -1353,47 +1184,6 @@ void FlatAffineValueConstraints::addBound(BoundType type, Value val,
   addBound(type, pos, value);
 }
 
-void FlatAffineValueConstraints::printSpace(raw_ostream &os) const {
-  IntegerPolyhedron::printSpace(os);
-  os << "(";
-  for (unsigned i = 0, e = getNumDimAndSymbolIds(); i < e; i++) {
-    if (hasValue(i))
-      os << "Value ";
-    else
-      os << "None ";
-  }
-  for (unsigned i = getIdKindOffset(IdKind::Local),
-                e = getIdKindEnd(IdKind::Local);
-       i < e; ++i)
-    os << "Local ";
-  os << " const)\n";
-}
-
-void FlatAffineValueConstraints::clearAndCopyFrom(
-    const IntegerRelation &other) {
-
-  if (auto *otherValueSet =
-          dyn_cast<const FlatAffineValueConstraints>(&other)) {
-    *this = *otherValueSet;
-  } else {
-    *static_cast<IntegerRelation *>(this) = other;
-    values.clear();
-    values.resize(getNumDimAndSymbolIds(), None);
-  }
-}
-
-void FlatAffineValueConstraints::fourierMotzkinEliminate(
-    unsigned pos, bool darkShadow, bool *isResultIntegerExact) {
-  SmallVector<Optional<Value>, 8> newVals = values;
-  if (getIdKindAt(pos) != IdKind::Local)
-    newVals.erase(newVals.begin() + pos);
-  // Note: Base implementation discards all associated Values.
-  IntegerPolyhedron::fourierMotzkinEliminate(pos, darkShadow,
-                                             isResultIntegerExact);
-  values = newVals;
-  assert(values.size() == getNumDimAndSymbolIds());
-}
-
 void FlatAffineValueConstraints::projectOut(Value val) {
   unsigned pos = findId(val);
   assert(pos < getNumDimAndSymbolIds() && "No value found");
@@ -1402,18 +1192,15 @@ void FlatAffineValueConstraints::projectOut(Value val) {
 
 LogicalResult FlatAffineValueConstraints::unionBoundingBox(
     const FlatAffineValueConstraints &otherCst) {
-  assert(otherCst.getNumDimIds() == getNumDimIds() && "dims mismatch");
-  assert(otherCst.getMaybeValues()
-             .slice(0, getNumDimIds())
-             .equals(getMaybeValues().slice(0, getNumDimIds())) &&
-         "dim values mismatch");
   assert(otherCst.getNumLocalIds() == 0 && "local ids not supported here");
   assert(getNumLocalIds() == 0 && "local ids not supported yet here");
+  assert(space.isAligned(otherCst.getSpace(), IdKind::SetDim) &&
+         "Dims are not aligned.");
 
   // Align `other` to this.
-  if (!areIdsAligned(*this, otherCst)) {
+  if (space.isAligned(otherCst.getSpace())) {
     FlatAffineValueConstraints otherCopy(otherCst);
-    mergeAndAlignIds(/*offset=*/getNumDimIds(), this, &otherCopy);
+    mergeAndAlign(IdKind::Symbol, otherCopy);
     return IntegerPolyhedron::unionBoundingBox(otherCopy);
   }
 
