@@ -74,18 +74,11 @@ public:
                         /*numReservedEqualities=*/0,
                         /*numReservedCols=*/space.getNumIds() + 1, space) {}
 
-  virtual ~IntegerRelation() = default;
-
   /// Return a system with no constraints, i.e., one which is satisfied by all
   /// points.
   static IntegerRelation getUniverse(const PresburgerSpace &space) {
     return IntegerRelation(space);
   }
-
-  /// Return the kind of this IntegerRelation.
-  virtual Kind getKind() const { return Kind::IntegerRelation; }
-
-  static bool classof(const IntegerRelation *cst) { return true; }
 
   // Clones this object.
   std::unique_ptr<IntegerRelation> clone() const;
@@ -273,7 +266,7 @@ public:
   /// corresponding to the added identifiers are initialized to zero. Return the
   /// absolute column position (i.e., not relative to the kind of identifier)
   /// of the first added identifier.
-  virtual unsigned insertId(IdKind kind, unsigned pos, unsigned num = 1);
+  unsigned insertId(IdKind kind, unsigned pos, unsigned num = 1);
 
   /// Append `num` identifiers of the specified kind after the last identifier.
   /// of that kind. Return the position of the first appended column relative to
@@ -289,13 +282,13 @@ public:
   /// Eliminate the `posB^th` local identifier, replacing every instance of it
   /// with the `posA^th` local identifier. This should be used when the two
   /// local variables are known to always take the same values.
-  virtual void eliminateRedundantLocalId(unsigned posA, unsigned posB);
+  void eliminateRedundantLocalId(unsigned posA, unsigned posB);
 
   /// Removes identifiers of the specified kind with the specified pos (or
   /// within the specified range) from the system. The specified location is
   /// relative to the first identifier of the specified kind.
   void removeId(IdKind kind, unsigned pos);
-  virtual void removeIdRange(IdKind kind, unsigned idStart, unsigned idLimit);
+  void removeIdRange(IdKind kind, unsigned idStart, unsigned idLimit);
 
   /// Removes the specified identifier from the system.
   void removeId(unsigned pos);
@@ -321,7 +314,7 @@ public:
   MaybeOptimum<SmallVector<int64_t, 8>> findIntegerLexMin() const;
 
   /// Swap the posA^th identifier with the posB^th identifier.
-  virtual void swapId(unsigned posA, unsigned posB);
+  void swapId(unsigned posA, unsigned posB);
 
   /// Removes all equalities and inequalities.
   void clearConstraints();
@@ -331,7 +324,7 @@ public:
   void setAndEliminate(unsigned pos, ArrayRef<int64_t> values);
 
   /// Replaces the contents of this IntegerRelation with `other`.
-  virtual void clearAndCopyFrom(const IntegerRelation &other);
+  void clearAndCopyFrom(const IntegerRelation &other);
 
   /// Gather positions of all lower and upper bounds of the identifier at `pos`,
   /// and optionally any equalities on it. In addition, the bounds are to be
@@ -656,7 +649,7 @@ protected:
   /// set to true, a potential under approximation (subset) of the rational
   /// shadow / exact integer shadow is computed.
   // See implementation comments for more details.
-  virtual void fourierMotzkinEliminate(unsigned pos, bool darkShadow = false,
+  void fourierMotzkinEliminate(unsigned pos, bool darkShadow = false,
                                        bool *isResultIntegerExact = nullptr);
 
   /// Tightens inequalities given that we are dealing with integer spaces. This
@@ -683,11 +676,11 @@ protected:
   /// Returns false if the fields corresponding to various identifier counts, or
   /// equality/inequality buffer sizes aren't consistent; true otherwise. This
   /// is meant to be used within an assert internally.
-  virtual bool hasConsistentState() const;
+  bool hasConsistentState() const;
 
   /// Prints the number of constraints, dimensions, symbols and locals in the
   /// IntegerRelation.
-  virtual void printSpace(raw_ostream &os) const;
+  void printSpace(raw_ostream &os) const;
 
   /// Removes identifiers in the column range [idStart, idLimit), and copies any
   /// remaining valid data into place, updates member variables, and resizes
@@ -782,21 +775,8 @@ public:
     return IntegerPolyhedron(space);
   }
 
-  /// Return the kind of this IntegerRelation.
-  Kind getKind() const override { return Kind::IntegerPolyhedron; }
-
-  static bool classof(const IntegerRelation *cst) {
-    return cst->getKind() == Kind::IntegerPolyhedron;
-  }
-
   // Clones this object.
   std::unique_ptr<IntegerPolyhedron> clone() const;
-
-  /// Insert `num` identifiers of the specified kind at position `pos`.
-  /// Positions are relative to the kind of identifier. Return the absolute
-  /// column position (i.e., not relative to the kind of identifier) of the
-  /// first added identifier.
-  unsigned insertId(IdKind kind, unsigned pos, unsigned num = 1) override;
 
   /// Compute the symbolic integer lexmin of the polyhedron.
   /// This finds, for every assignment to the symbols, the lexicographically
