@@ -199,6 +199,9 @@ public:
     usingValues = true;
   }
 
+  /// Disable values being stored in space.
+  void disableValues() { usingValues = false; }
+
 protected:
   PresburgerSpace(unsigned numDomain = 0, unsigned numRange = 0,
                   unsigned numSymbols = 0, unsigned numLocals = 0)

@@ -99,6 +99,8 @@ public:
     space.resetValues<T>();
   }
 
+  void disableValues() { space.disableValues(); }
+
   /// Appends constraints from `other` into `this`. This is equivalent to an
   /// intersection with no simplification of any sort attempted.
   void append(const IntegerRelation &other);
@@ -650,7 +652,7 @@ protected:
   /// shadow / exact integer shadow is computed.
   // See implementation comments for more details.
   void fourierMotzkinEliminate(unsigned pos, bool darkShadow = false,
-                                       bool *isResultIntegerExact = nullptr);
+                               bool *isResultIntegerExact = nullptr);
 
   /// Tightens inequalities given that we are dealing with integer spaces. This
   /// is similar to the GCD test but applied to inequalities. The constant term

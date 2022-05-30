@@ -55,14 +55,102 @@ public:
 
   const PresburgerSpace &getSpace() const { return space; }
 
+  template <typename T>
+  void resetValues() {
+    space.resetValues<T>();
+  }
+
   /// Return a reference to the list of disjuncts.
   ArrayRef<IntegerRelation> getAllDisjuncts() const;
 
   /// Return the disjunct at the specified index.
   const IntegerRelation &getDisjunct(unsigned index) const;
 
-  /// Mutate this set, turning it into the union of this set and the given
-  /// disjunct.
+  /// Get the number of ids of the specified kind.
+  unsigned getNumIdKind(IdKind kind) const { return space.getNumIdKind(kind); };
+
+  /// Return the index at which the specified kind of id starts.
+  unsigned getIdKindOffset(IdKind kind) const {
+    return space.getIdKindOffset(kind);
+  };
+
+  /// Return the index at Which the specified kind of id ends.
+  unsigned getIdKindEnd(IdKind kind) const { return space.getIdKindEnd(kind); };
+
+  /// Get the number of elements of the specified kind in the range
+  /// [idStart, idLimit).
+  unsigned getIdKindOverlap(IdKind kind, unsigned idStart,
+                            unsigned idLimit) const {
+    return space.getIdKindOverlap(kind, idStart, idLimit);
+  };
+
+  /// Return the IdKind of the id at the specified position.
+  IdKind getIdKindAt(unsigned pos) const { return space.getIdKindAt(pos); };
+
+  void *&atValue(IdKind kind, unsigned i) { return space.atValue(kind, i); }
+  void *atValue(IdKind kind, unsigned i) const {
+    return space.atValue(kind, i);
+  }
+
+  void *&atValue(unsigned i) {
+    return space.atValue(getIdKindAt(i), i - getIdKindOffset(getIdKindAt(i)));
+  }
+  void *atValue(unsigned i) const {
+    return space.atValue(getIdKindAt(i), i - getIdKindOffset(getIdKindAt(i)));
+  }
+
+  /// Set the value attached to the `i^th` variable of specified kind to
+  /// `value`.
+  template <typename T>
+  void setValue(IdKind kind, unsigned i, T value) {
+    space.setValue<T>(kind, i, value);
+  }
+
+  /// Set the value attached to the `i^th` variable to `value`.
+  template <typename T>
+  void setValue(unsigned i, T value) {
+    space.setValue<T>(getIdKindAt(i), i - getIdKindOffset(getIdKindAt(i)),
+                      value);
+  }
+
+  /// Get the value attached to the `i^th` variable of the specified kind casted
+  /// to type `T`.
+  template <typename T>
+  T getValue(IdKind kind, unsigned i) const {
+    return space.getValue<T>(kind, i);
+  }
+
+  /// Get the value attached to the `i^th` variable casted to type `T`.
+  template <typename T>
+  T getValue(unsigned i) const {
+    return space.getValue<T>(getIdKindAt(i),
+                             i - getIdKindOffset(getIdKindAt(i)));
+  }
+
+  bool hasValue(IdKind kind, unsigned i) const {
+    return atValue(kind, i) != nullptr;
+  }
+  bool hasValue(unsigned i) const { return atValue(i) != nullptr; }
+
+  void mergeAndAlign(IdKind kind, IdKind kindOther, PresburgerRelation &other);
+  void mergeAndAlign(IdKind kind, PresburgerRelation &other);
+  void mergeAndAlign(PresburgerRelation &other);
+
+  /// Insert `num` identifiers of the specified kind at position `pos`.
+  /// Positions are relative to the kind of identifier. The coefficient columns
+  /// corresponding to the added identifiers are initialized to zero. Return the
+  /// absolute column position (i.e., not relative to the kind of identifier)
+  /// of the first added identifier.
+  unsigned insertId(IdKind kind, unsigned pos, unsigned num = 1);
+
+  /// Swap the posA^th identifier with the posB^th identifier.
+  void swapId(unsigned posA, unsigned posB);
+
+  /// Removes identifiers of the specified kind with the specified pos (or
+  /// within the specified range) from the system. The specified location is
+  /// relative to the first identifier of the specified kind.
+  void removeIdRange(IdKind kind, unsigned idStart, unsigned idLimit);
+
   void unionInPlace(const IntegerRelation &disjunct);
 
   /// Mutate this set, turning it into the union of this set and the given set.
