@@ -650,7 +650,7 @@ protected:
   /// shadow / exact integer shadow is computed.
   // See implementation comments for more details.
   void fourierMotzkinEliminate(unsigned pos, bool darkShadow = false,
-                                       bool *isResultIntegerExact = nullptr);
+                               bool *isResultIntegerExact = nullptr);
 
   /// Tightens inequalities given that we are dealing with integer spaces. This
   /// is similar to the GCD test but applied to inequalities. The constant term

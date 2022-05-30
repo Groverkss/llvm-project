@@ -757,7 +757,90 @@ PresburgerRelation PresburgerRelation::coalesce() const {
   return SetCoalescer(*this).coalesce();
 }
 
+unsigned PresburgerRelation::insertId(IdKind kind, unsigned pos, unsigned num) {
+  assert(pos <= getNumIdKind(kind));
+
+  unsigned insertPos = space.insertId(kind, pos, num);
+  for (IntegerRelation &disjunct : disjuncts)
+    disjunct.insertId(kind, pos, num);
+  return insertPos;
+}
+
+void PresburgerRelation::swapId(unsigned posA, unsigned posB) {
+  assert(posA < getNumIds() && "invalid position A");
+  assert(posB < getNumIds() && "invalid position B");
+
+  if (posA == posB)
+    return;
+
+  for (IntegerRelation &disjunct : disjuncts)
+    disjunct.swapId(posA, posB);
+
+  IdKind kindA = getIdKindAt(posA);
+  IdKind kindB = getIdKindAt(posB);
+  space.swapId(kindA, kindB, posA - getIdKindOffset(kindA),
+               posB - getIdKindOffset(kindB));
+}
+
+void PresburgerRelation::removeIdRange(IdKind kind, unsigned idStart,
+                                       unsigned idLimit) {
+  assert(idLimit <= getNumIdKind(kind));
+
+  if (idStart >= idLimit)
+    return;
+
+  // Remove eliminated identifiers from the disjuncts.
+  for (IntegerRelation &disjunct : disjuncts)
+    disjunct.removeIdRange(kind, idStart, idLimit);
+
+  // Remove eliminated identifiers from the space.
+  space.removeIdRange(kind, idStart, idLimit);
+}
+
+void PresburgerRelation::mergeAndAlign(IdKind kind, IdKind kindOther,
+                                       PresburgerRelation &other) {
+  // TODO: Add asserts to check uniqueness of values.
+
+  // Merge ids: merge ids into `other` first from `this`.
+  unsigned otherOffset = other.getIdKindOffset(kindOther);
+  for (unsigned i = 0, e = getNumIdKind(kind); i < e; ++i) {
+    // Get the position for id in `other` with the same value as id at position
+    // `i` in `this`.
+    unsigned loc = other.space.findId(kindOther, space.atValue(kind, i));
+
+    if (loc == other.getNumIdKind(kindOther)) {
+      // Id was not found.
+      other.insertId(kindOther, i);
+      other.space.atValue(kindOther, i) = space.atValue(kind, i);
+    } else {
+      // Id was found.
+      other.swapId(otherOffset + i, otherOffset + loc);
+    }
+  }
+
+  // Values that are in `other`, but not in `this`, are added at the end.
+  unsigned startNewIds = getNumIdKind(kind);
+  insertId(kind, startNewIds, other.getNumIdKind(kindOther) - startNewIds);
+  for (unsigned i = startNewIds, e = other.getNumIdKind(kindOther); i < e; ++i)
+    space.atValue(kind, i) = other.space.atValue(kindOther, i);
+
+  assert(getNumIdKind(kind) == other.getNumIdKind(kindOther) &&
+         "expected same number of ids");
+}
+
+void PresburgerRelation::mergeAndAlign(IdKind kind, PresburgerRelation &other) {
+  mergeAndAlign(kind, kind, other);
+}
+
+void PresburgerRelation::mergeAndAlign(PresburgerRelation &other) {
+  mergeAndAlign(IdKind::Domain, other);
+  mergeAndAlign(IdKind::Range, other);
+  mergeAndAlign(IdKind::Symbol, other);
+}
+
 void PresburgerRelation::print(raw_ostream &os) const {
+  os << "Space:\n";
+  space.print(os);
   os << "Number of Disjuncts: " << getNumDisjuncts() << "\n";
   for (const IntegerRelation &disjunct : disjuncts) {
     disjunct.print(os);
