@@ -103,13 +103,6 @@ public:
   static FlatAffineValueConstraints
   getHyperrectangular(ValueRange ivs, ValueRange lbs, ValueRange ubs);
 
-  /// Return the kind of this FlatAffineConstraints.
-  Kind getKind() const override { return Kind::FlatAffineValueConstraints; }
-
-  static bool classof(const IntegerRelation *cst) {
-    return cst->getKind() == Kind::FlatAffineValueConstraints;
-  }
-
   /// Clears any existing data and reserves memory for the specified
   /// constraints.
   void reset(unsigned numReservedInequalities, unsigned numReservedEqualities,
