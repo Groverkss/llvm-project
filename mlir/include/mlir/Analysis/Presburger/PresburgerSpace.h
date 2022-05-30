@@ -180,6 +180,7 @@ public:
   }
 
   bool isAligned(const PresburgerSpace &other) const;
+  bool isAligned(const PresburgerSpace &other, IdKind kind) const;
 
   unsigned findId(IdKind kind, void *val) const;
 

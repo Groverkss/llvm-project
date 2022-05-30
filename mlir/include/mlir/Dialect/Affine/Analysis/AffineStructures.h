@@ -49,11 +49,12 @@ public:
                               numDims, numSymbols, numLocals)) {
     assert(numReservedCols >= getNumIds() + 1);
     assert(valArgs.empty() || valArgs.size() == getNumDimAndSymbolIds());
-    values.reserve(numReservedCols);
-    if (valArgs.empty())
-      values.resize(getNumDimAndSymbolIds(), None);
-    else
-      values.append(valArgs.begin(), valArgs.end());
+
+    // Reset and set values.
+    resetValues<detail::ValueImpl *>();
+    for (unsigned i = 0, e = valArgs.size(); i < e; ++i)
+      if (valArgs[i].hasValue())
+        setValue(i, valArgs[i].getValue());
   }
 
   /// Constructs a constraint system with the specified number of
@@ -71,10 +72,10 @@ public:
                              ArrayRef<Optional<Value>> valArgs = {})
       : IntegerPolyhedron(fac) {
     assert(valArgs.empty() || valArgs.size() == getNumDimAndSymbolIds());
-    if (valArgs.empty())
-      values.resize(getNumDimAndSymbolIds(), None);
-    else
-      values.append(valArgs.begin(), valArgs.end());
+    resetValues<detail::ValueImpl *>();
+    for (unsigned i = 0, e = valArgs.size(); i < e; ++i)
+      if (valArgs[i].hasValue())
+        setValue(i, valArgs[i].getValue());
   }
 
   /// Create a flat affine constraint system from an AffineValueMap or a list of
@@ -266,9 +267,6 @@ public:
   /// symbols).
   unsigned findId(Value val) const;
 
-  /// Swap the posA^th identifier with the posB^th identifier.
-  void swapId(unsigned posA, unsigned posB) override;
-
   /// Insert identifiers of the specified kind at position `pos`. Positions are
   /// relative to the kind of identifier. The coefficient columns corresponding
   /// to the added identifiers are initialized to zero. `vals` are the Values
@@ -289,9 +287,8 @@ public:
   }
   unsigned insertDimId(unsigned pos, ValueRange vals);
   unsigned insertSymbolId(unsigned pos, ValueRange vals);
-  unsigned insertId(presburger::IdKind kind, unsigned pos,
-                    unsigned num = 1) override;
   unsigned insertId(presburger::IdKind kind, unsigned pos, ValueRange vals);
+  using IntegerPolyhedron::insertId;
 
   /// Append identifiers of the specified kind after the last identifier of that
   /// kind. The coefficient columns corresponding to the added identifiers are
@@ -310,13 +307,6 @@ public:
   unsigned appendLocalId(unsigned num = 1) {
     return appendId(IdKind::Local, num);
   }
-
-  /// Removes identifiers in the column range [idStart, idLimit), and copies any
-  /// remaining valid data into place, updates member variables, and resizes
-  /// arrays as needed.
-  void removeIdRange(presburger::IdKind kind, unsigned idStart,
-                     unsigned idLimit) override;
-  using IntegerPolyhedron::removeIdRange;
 
   /// Add the specified values as a dim or symbol id depending on its nature, if
   /// it already doesn't exist in the system. `val` has to be either a terminal
@@ -369,41 +359,11 @@ public:
   LogicalResult unionBoundingBox(const FlatAffineValueConstraints &other);
   using IntegerPolyhedron::unionBoundingBox;
 
-  /// Merge and align the identifiers of `this` and `other` starting at
-  /// `offset`, so that both constraint systems get the union of the contained
-  /// identifiers that is dimension-wise and symbol-wise unique; both
-  /// constraint systems are updated so that they have the union of all
-  /// identifiers, with `this`'s original identifiers appearing first followed
-  /// by any of `other`'s identifiers that didn't appear in `this`. Local
-  /// identifiers in `other` that have the same division representation as local
-  /// identifiers in `this` are merged into one.
-  //  E.g.: Input: `this`  has (%i, %j) [%M, %N]
-  //               `other` has (%k, %j) [%P, %N, %M]
-  //        Output: both `this`, `other` have (%i, %j, %k) [%M, %N, %P]
-  //
-  void mergeAndAlignIdsWithOther(unsigned offset,
-                                 FlatAffineValueConstraints *other);
-
-  /// Returns true if this constraint system and `other` are in the same
-  /// space, i.e., if they are associated with the same set of identifiers,
-  /// appearing in the same order. Returns false otherwise.
-  bool areIdsAlignedWithOther(const FlatAffineValueConstraints &other);
-
-  /// Replaces the contents of this FlatAffineValueConstraints with `other`.
-  void clearAndCopyFrom(const IntegerRelation &other) override;
-
   /// Returns the Value associated with the pos^th identifier. Asserts if
   /// no Value identifier was associated.
   inline Value getValue(unsigned pos) const {
-    assert(pos < getNumDimAndSymbolIds() && "Invalid position");
     assert(hasValue(pos) && "identifier's Value not set");
-    return values[pos].getValue();
-  }
-
-  /// Returns true if the pos^th identifier has an associated Value.
-  inline bool hasValue(unsigned pos) const {
-    assert(pos < getNumDimAndSymbolIds() && "Invalid position");
-    return values[pos].hasValue();
+    return Value(IntegerRelation::getValue<detail::ValueImpl *>(pos));
   }
 
   /// Returns the Values associated with identifiers in range [start, end).
@@ -421,21 +381,9 @@ public:
     getValues(0, getNumDimAndSymbolIds(), values);
   }
 
-  inline ArrayRef<Optional<Value>> getMaybeValues() const {
-    return {values.data(), values.size()};
-  }
-
-  inline ArrayRef<Optional<Value>>
-  getMaybeValues(presburger::IdKind kind) const {
-    assert(kind != IdKind::Local &&
-           "Local identifiers do not have any value attached to them.");
-    return {values.data() + getIdKindOffset(kind), getNumIdKind(kind)};
-  }
-
   /// Sets the Value associated with the pos^th identifier.
   inline void setValue(unsigned pos, Value val) {
-    assert(pos < getNumDimAndSymbolIds() && "invalid id position");
-    values[pos] = val;
+    IntegerRelation::setValue(pos, val.getImpl());
   }
 
   /// Sets the Values associated with the identifiers in the range [start, end).
@@ -449,19 +397,8 @@ public:
       setValue(i, values[i - start]);
   }
 
-  /// Merge and align symbols of `this` and `other` such that both get union of
-  /// of symbols that are unique. Symbols in `this` and `other` should be
-  /// unique. Symbols with Value as `None` are considered to be inequal to all
-  /// other symbols.
-  void mergeSymbolIds(FlatAffineValueConstraints &other);
-
 protected:
   using IdKind = presburger::IdKind;
-
-  /// Returns false if the fields corresponding to various identifier counts, or
-  /// equality/inequality buffer sizes aren't consistent; true otherwise. This
-  /// is meant to be used within an assert internally.
-  bool hasConsistentState() const override;
 
   /// Given an affine map that is aligned with this constraint system:
   /// * Flatten the map.
@@ -475,27 +412,6 @@ protected:
   ///       `composeMatchingMap`.
   LogicalResult flattenAlignedMapAndMergeLocals(
       AffineMap map, std::vector<SmallVector<int64_t, 8>> *flattenedExprs);
-
-  /// Eliminates the identifier at the specified position using Fourier-Motzkin
-  /// variable elimination, but uses Gaussian elimination if there is an
-  /// equality involving that identifier. If the result of the elimination is
-  /// integer exact, `*isResultIntegerExact` is set to true. If `darkShadow` is
-  /// set to true, a potential under approximation (subset) of the rational
-  /// shadow / exact integer shadow is computed.
-  // See implementation comments for more details.
-  void fourierMotzkinEliminate(unsigned pos, bool darkShadow = false,
-                               bool *isResultIntegerExact = nullptr) override;
-
-  /// Prints the number of constraints, dimensions, symbols and locals in the
-  /// FlatAffineConstraints. Also, prints for each identifier whether there is
-  /// an SSA Value attached to it.
-  void printSpace(raw_ostream &os) const override;
-
-  /// Values corresponding to the (column) non-local identifiers of this
-  /// constraint system appearing in the order the identifiers correspond to
-  /// columns. Identifiers that aren't associated with any Value are set to
-  /// None.
-  SmallVector<Optional<Value>, 8> values;
 };
 
 /// Flattens 'expr' into 'flattenedExpr', which contains the coefficients of the

@@ -100,6 +100,12 @@ public:
                                              space.getNumSymbolIds());
   }
 
+  /// Reset the stored values in space.
+  template <typename T>
+  void resetValues() {
+    space.resetValues<T>();
+  }
+
   /// Appends constraints from `other` into `this`. This is equivalent to an
   /// intersection with no simplification of any sort attempted.
   void append(const IntegerRelation &other);
@@ -118,6 +124,10 @@ public:
   /// check (see IntegerRelation::findIntegerSample()).
   bool isSubsetOf(const IntegerRelation &other) const;
 
+  bool isAligned(const IntegerRelation &other) const {
+    return space.isAligned(other.space);
+  }
+
   /// Returns the value at the specified equality row and column.
   inline int64_t atEq(unsigned i, unsigned j) const { return equalities(i, j); }
   inline int64_t &atEq(unsigned i, unsigned j) { return equalities(i, j); }
@@ -128,23 +138,50 @@ public:
   }
   inline int64_t &atIneq(unsigned i, unsigned j) { return inequalities(i, j); }
 
-  /// Set the value attached to the `i^th` variable to `value`.
+  void *&atValue(IdKind kind, unsigned i) { return space.atValue(kind, i); }
+  void *atValue(IdKind kind, unsigned i) const {
+    return space.atValue(kind, i);
+  }
+
+  void *&atValue(unsigned i) {
+    return space.atValue(getIdKindAt(i), i - getIdKindOffset(getIdKindAt(i)));
+  }
+  void *atValue(unsigned i) const {
+    return space.atValue(getIdKindAt(i), i - getIdKindOffset(getIdKindAt(i)));
+  }
+
+  /// Set the value attached to the `i^th` variable of specified kind to
+  /// `value`.
   template <typename T>
   void setValue(IdKind kind, unsigned i, T value) {
     space.setValue<T>(kind, i, value);
   }
 
-  /// Get the value attached to the `i^th` variable casted to type `T`.
+  /// Set the value attached to the `i^th` variable to `value`.
+  template <typename T>
+  void setValue(unsigned i, T value) {
+    space.setValue<T>(getIdKindAt(i), i - getIdKindOffset(getIdKindAt(i)),
+                      value);
+  }
+
+  /// Get the value attached to the `i^th` variable of the specified kind casted
+  /// to type `T`.
   template <typename T>
   T getValue(IdKind kind, unsigned i) const {
     return space.getValue<T>(kind, i);
   }
 
-  /// Reset the stored values in space.
+  /// Get the value attached to the `i^th` variable casted to type `T`.
   template <typename T>
-  void resetValues() {
-    space.resetValues<T>();
+  T getValue(unsigned i) const {
+    return space.getValue<T>(getIdKindAt(i),
+                             i - getIdKindOffset(getIdKindAt(i)));
   }
+
+  bool hasValue(IdKind kind, unsigned i) const {
+    return atValue(kind, i) != nullptr;
+  }
+  bool hasValue(unsigned i) const { return atValue(i) != nullptr; }
 
   unsigned getNumConstraints() const {
     return getNumInequalities() + getNumEqualities();

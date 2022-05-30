@@ -25,11 +25,15 @@
 using namespace mlir;
 using namespace presburger;
 
-static void unpackOptionalValues(ArrayRef<Optional<Value>> source,
-                                 SmallVector<Value> &target) {
-  target = llvm::to_vector<4>(llvm::map_range(source, [](Optional<Value> val) {
-    return val.hasValue() ? *val : Value();
-  }));
+static void getValues(const FlatAffineValueConstraints &cst,
+                      SmallVector<Value> &target, unsigned start,
+                      unsigned end) {
+  assert(start <= cst.getNumDimAndSymbolIds() && end >= start &&
+         "Invalid value range.");
+
+  target.reserve(end - start);
+  for (unsigned i = start; i < end; ++i)
+    target.push_back(cst.hasValue(i) ? cst.getValue(i) : Value());
 }
 
 /// Bound an identifier `pos` in a given FlatAffineValueConstraints with
@@ -43,8 +47,10 @@ static LogicalResult alignAndAddBound(FlatAffineValueConstraints &constraints,
                                       unsigned pos, AffineMap map,
                                       ValueRange operands) {
   SmallVector<Value> dims, syms, newSyms;
-  unpackOptionalValues(constraints.getMaybeValues(IdKind::SetDim), dims);
-  unpackOptionalValues(constraints.getMaybeValues(IdKind::Symbol), syms);
+  getValues(constraints, dims, constraints.getIdKindOffset(IdKind::SetDim),
+            constraints.getIdKindEnd(IdKind::SetDim));
+  getValues(constraints, syms, constraints.getIdKindOffset(IdKind::Symbol),
+            constraints.getIdKindEnd(IdKind::Symbol));
 
   AffineMap alignedMap =
       alignAffineMapWithValues(map, operands, dims, syms, &newSyms);
@@ -182,7 +188,7 @@ canonicalizeMinMaxOp(RewriterBase &rewriter, Operation *op, AffineMap map,
   // Lower and upper bound of `op` are equal. Replace `minOp` with its bound.
   AffineMap newMap = alignedBoundMap;
   SmallVector<Value> newOperands;
-  unpackOptionalValues(constraints.getMaybeValues(), newOperands);
+  getValues(constraints, newOperands, 0, constraints.getNumDimAndSymbolIds());
   // If dims/symbols have known constant values, use those in order to simplify
   // the affine map further.
   for (int64_t i = 0, e = constraints.getNumIds(); i < e; ++i) {
