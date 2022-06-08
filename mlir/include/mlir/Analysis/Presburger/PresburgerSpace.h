@@ -17,6 +17,7 @@
 #include "mlir/Support/TypeID.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/PointerLikeTypeTraits.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace mlir {
@@ -169,14 +170,14 @@ public:
   template <typename T>
   void setValue(IdKind kind, unsigned i, T value) {
     assert(TypeID::get<T>() == valueType && "Type mismatch");
-    atValue(kind, i) = static_cast<void *>(value);
+    atValue(kind, i) = llvm::PointerLikeTypeTraits<T>::getAsVoidPointer(value);
   }
 
   /// Get the value attached to the `i^th` variable casted to type `T`.
   template <typename T>
   T getValue(IdKind kind, unsigned i) const {
     assert(TypeID::get<T>() == valueType && "Type mismatch");
-    return static_cast<T>(atValue(kind, i));
+    return llvm::PointerLikeTypeTraits<T>::getFromVoidPointer(atValue(kind, i));
   }
 
   bool isAligned(const PresburgerSpace &other) const;
