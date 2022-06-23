@@ -374,13 +374,13 @@ areIdsUnique(const FlatAffineValueConstraints &cst) {
 /// Checks if the SSA values associated with `cst`'s identifiers of kind `kind`
 /// are unique.
 static bool LLVM_ATTRIBUTE_UNUSED
-areIdsUnique(const FlatAffineValueConstraints &cst, IdKind kind) {
+areIdsUnique(const FlatAffineValueConstraints &cst, VarKind kind) {
 
-  if (kind == IdKind::SetDim)
+  if (kind == VarKind::SetDim)
     return areIdsUnique(cst, 0, cst.getNumDimIds());
-  if (kind == IdKind::Symbol)
+  if (kind == VarKind::Symbol)
     return areIdsUnique(cst, cst.getNumDimIds(), cst.getNumDimAndSymbolIds());
-  llvm_unreachable("Unexpected IdKind");
+  llvm_unreachable("Unexpected VarKind");
 }
 
 /// Merge and align the identifiers of A and B starting at 'offset', so that

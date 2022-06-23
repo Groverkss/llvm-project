@@ -267,7 +267,7 @@ static PresburgerRelation getSetDifference(IntegerRelation b,
 
       unsigned offset = simplex.getNumConstraints();
       unsigned numLocalsAdded =
-          b.getNumLocalIds() - initBCounts.getSpace().getNumLocalIds();
+          b.getNumLocalIds() - initBCounts.getSpace().getNumLocalVars();
       simplex.appendVariable(numLocalsAdded);
 
       unsigned snapshotBeforeIntersect = simplex.getSnapshot();

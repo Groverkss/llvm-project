@@ -88,15 +88,15 @@ bool MultiAffineFunction::isEqual(const MultiAffineFunction &other) const {
          isEqualWhereDomainsOverlap(other);
 }
 
-unsigned MultiAffineFunction::insertId(IdKind kind, unsigned pos,
+unsigned MultiAffineFunction::insertId(VarKind kind, unsigned pos,
                                        unsigned num) {
-  assert(kind != IdKind::Domain && "Domain has to be zero in a set");
+  assert(kind != VarKind::Domain && "Domain has to be zero in a set");
   unsigned absolutePos = domainSet.getIdKindOffset(kind) + pos;
   output.insertColumns(absolutePos, num);
   return domainSet.insertId(kind, pos, num);
 }
 
-void MultiAffineFunction::removeIdRange(IdKind kind, unsigned idStart,
+void MultiAffineFunction::removeIdRange(VarKind kind, unsigned idStart,
                                         unsigned idLimit) {
   output.removeColumns(idStart + domainSet.getIdKindOffset(kind),
                        idLimit - idStart);
@@ -119,9 +119,9 @@ void MultiAffineFunction::mergeLocalIds(MultiAffineFunction &other) {
   // Merge output local ids of both functions without using division
   // information i.e. append local ids of `other` to `this` and insert
   // local ids of `this` to `other` at the start of it's local ids.
-  output.insertColumns(domainSet.getIdKindEnd(IdKind::Local),
+  output.insertColumns(domainSet.getIdKindEnd(VarKind::Local),
                        other.domainSet.getNumLocalIds());
-  other.output.insertColumns(other.domainSet.getIdKindOffset(IdKind::Local),
+  other.output.insertColumns(other.domainSet.getIdKindOffset(VarKind::Local),
                              domainSet.getNumLocalIds());
 
   auto merge = [this, &other](unsigned i, unsigned j) -> bool {
@@ -129,7 +129,7 @@ void MultiAffineFunction::mergeLocalIds(MultiAffineFunction &other) {
     domainSet.eliminateRedundantLocalId(i, j);
     other.domainSet.eliminateRedundantLocalId(i, j);
 
-    unsigned localOffset = domainSet.getIdKindOffset(IdKind::Local);
+    unsigned localOffset = domainSet.getIdKindOffset(VarKind::Local);
 
     // Merge local at position j into local at position i in output domain.
     output.addToColumn(localOffset + j, localOffset + i, 1);

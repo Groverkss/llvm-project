@@ -314,8 +314,8 @@ void presburger::mergeLocalIds(
   // i.e. append local ids of `relB` to `relA` and insert local ids of `relA`
   // to `relB` at start of its local ids.
   unsigned initLocals = relA.getNumLocalIds();
-  relA.insertId(IdKind::Local, relA.getNumLocalIds(), relB.getNumLocalIds());
-  relB.insertId(IdKind::Local, 0, initLocals);
+  relA.insertId(VarKind::Local, relA.getNumLocalIds(), relB.getNumLocalIds());
+  relB.insertId(VarKind::Local, 0, initLocals);
 
   // Get division representations from each rel.
   std::vector<SmallVector<int64_t, 8>> divsA, divsB;
@@ -333,7 +333,7 @@ void presburger::mergeLocalIds(
             denomsA.begin() + initLocals);
 
   // Merge all divisions by removing duplicate divisions.
-  unsigned localOffset = relA.getIdKindOffset(IdKind::Local);
+  unsigned localOffset = relA.getIdKindOffset(VarKind::Local);
   presburger::removeDuplicateDivs(divsA, denomsA, localOffset, merge);
 }
 

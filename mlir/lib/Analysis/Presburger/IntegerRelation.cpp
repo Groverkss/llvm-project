@@ -132,22 +132,22 @@ IntegerRelation::CountsSnapshot IntegerRelation::getCounts() const {
   return {getSpace(), getNumInequalities(), getNumEqualities()};
 }
 
-void IntegerRelation::truncateIdKind(IdKind kind, unsigned num) {
+void IntegerRelation::truncateIdKind(VarKind kind, unsigned num) {
   unsigned curNum = getNumIdKind(kind);
   assert(num <= curNum && "Can't truncate to more ids!");
   removeIdRange(kind, num, curNum);
 }
 
-void IntegerRelation::truncateIdKind(IdKind kind,
+void IntegerRelation::truncateIdKind(VarKind kind,
                                      const CountsSnapshot &counts) {
-  truncateIdKind(kind, counts.getSpace().getNumIdKind(kind));
+  truncateIdKind(kind, counts.getSpace().getNumVarKind(kind));
 }
 
 void IntegerRelation::truncate(const CountsSnapshot &counts) {
-  truncateIdKind(IdKind::Domain, counts);
-  truncateIdKind(IdKind::Range, counts);
-  truncateIdKind(IdKind::Symbol, counts);
-  truncateIdKind(IdKind::Local, counts);
+  truncateIdKind(VarKind::Domain, counts);
+  truncateIdKind(VarKind::Range, counts);
+  truncateIdKind(VarKind::Symbol, counts);
+  truncateIdKind(VarKind::Local, counts);
   removeInequalityRange(counts.getNumIneqs(), getNumInequalities());
   removeEqualityRange(counts.getNumEqs(), getNumEqualities());
 }
@@ -167,16 +167,16 @@ SymbolicLexMin IntegerPolyhedron::findSymbolicIntegerLexMin() const {
   return result;
 }
 
-unsigned IntegerRelation::insertId(IdKind kind, unsigned pos, unsigned num) {
+unsigned IntegerRelation::insertId(VarKind kind, unsigned pos, unsigned num) {
   assert(pos <= getNumIdKind(kind));
 
-  unsigned insertPos = space.insertId(kind, pos, num);
+  unsigned insertPos = space.insertVar(kind, pos, num);
   inequalities.insertColumns(insertPos, num);
   equalities.insertColumns(insertPos, num);
   return insertPos;
 }
 
-unsigned IntegerRelation::appendId(IdKind kind, unsigned num) {
+unsigned IntegerRelation::appendId(VarKind kind, unsigned num) {
   unsigned pos = getNumIdKind(kind);
   return insertId(kind, pos, num);
 }
@@ -195,13 +195,13 @@ void IntegerRelation::addInequality(ArrayRef<int64_t> inEq) {
     inequalities(row, i) = inEq[i];
 }
 
-void IntegerRelation::removeId(IdKind kind, unsigned pos) {
+void IntegerRelation::removeId(VarKind kind, unsigned pos) {
   removeIdRange(kind, pos, pos + 1);
 }
 
 void IntegerRelation::removeId(unsigned pos) { removeIdRange(pos, pos + 1); }
 
-void IntegerRelation::removeIdRange(IdKind kind, unsigned idStart,
+void IntegerRelation::removeIdRange(VarKind kind, unsigned idStart,
                                     unsigned idLimit) {
   assert(idLimit <= getNumIdKind(kind));
 
@@ -214,7 +214,7 @@ void IntegerRelation::removeIdRange(IdKind kind, unsigned idStart,
   inequalities.removeColumns(offset + idStart, idLimit - idStart);
 
   // Remove eliminated identifiers from the space.
-  space.removeIdRange(kind, idStart, idLimit);
+  space.removeVarRange(kind, idStart, idLimit);
 }
 
 void IntegerRelation::removeIdRange(unsigned idStart, unsigned idLimit) {
@@ -226,7 +226,7 @@ void IntegerRelation::removeIdRange(unsigned idStart, unsigned idLimit) {
   // Helper function to remove ids of the specified kind in the given range
   // [start, limit), The range is absolute (i.e. it is not relative to the kind
   // of identifier). Also updates `limit` to reflect the deleted identifiers.
-  auto removeIdKindInRange = [this](IdKind kind, unsigned &start,
+  auto removeIdKindInRange = [this](VarKind kind, unsigned &start,
                                     unsigned &limit) {
     if (start >= limit)
       return;
@@ -249,10 +249,10 @@ void IntegerRelation::removeIdRange(unsigned idStart, unsigned idLimit) {
     limit -= relativeLimit - relativeStart;
   };
 
-  removeIdKindInRange(IdKind::Domain, idStart, idLimit);
-  removeIdKindInRange(IdKind::Range, idStart, idLimit);
-  removeIdKindInRange(IdKind::Symbol, idStart, idLimit);
-  removeIdKindInRange(IdKind::Local, idStart, idLimit);
+  removeIdKindInRange(VarKind::Domain, idStart, idLimit);
+  removeIdKindInRange(VarKind::Range, idStart, idLimit);
+  removeIdKindInRange(VarKind::Symbol, idStart, idLimit);
+  removeIdKindInRange(VarKind::Local, idStart, idLimit);
 }
 
 void IntegerRelation::removeEquality(unsigned pos) {
@@ -815,7 +815,7 @@ Optional<SmallVector<int64_t, 8>>
 IntegerRelation::containsPointNoLocal(ArrayRef<int64_t> point) const {
   assert(point.size() == getNumIds() - getNumLocalIds() &&
          "Point should contain all ids except locals!");
-  assert(getIdKindOffset(IdKind::Local) == getNumIds() - getNumLocalIds() &&
+  assert(getIdKindOffset(VarKind::Local) == getNumIds() - getNumLocalIds() &&
          "This function depends on locals being stored last!");
   IntegerRelation copy = *this;
   copy.setAndEliminate(0, point);
@@ -1068,7 +1068,7 @@ void IntegerRelation::eliminateRedundantLocalId(unsigned posA, unsigned posB) {
   assert(posA < getNumLocalIds() && "Invalid local id position");
   assert(posB < getNumLocalIds() && "Invalid local id position");
 
-  unsigned localOffset = getIdKindOffset(IdKind::Local);
+  unsigned localOffset = getIdKindOffset(VarKind::Local);
   posA += localOffset;
   posB += localOffset;
   inequalities.addToColumn(posB, posA, 1);
@@ -1129,7 +1129,7 @@ void IntegerRelation::removeDuplicateDivs() {
     eliminateRedundantLocalId(i, j);
     return true;
   };
-  presburger::removeDuplicateDivs(divs, denoms, getIdKindOffset(IdKind::Local),
+  presburger::removeDuplicateDivs(divs, denoms, getIdKindOffset(VarKind::Local),
                                   merge);
 }
 
@@ -1181,8 +1181,8 @@ void IntegerRelation::removeRedundantLocalVars() {
   }
 }
 
-void IntegerRelation::convertIdKind(IdKind srcKind, unsigned idStart,
-                                    unsigned idLimit, IdKind dstKind,
+void IntegerRelation::convertIdKind(VarKind srcKind, unsigned idStart,
+                                    unsigned idLimit, VarKind dstKind,
                                     unsigned pos) {
   assert(idLimit <= getNumIdKind(srcKind) && "Invalid id range");
 
@@ -1243,7 +1243,7 @@ void IntegerRelation::addLocalFloorDiv(ArrayRef<int64_t> dividend,
   assert(dividend.size() == getNumCols() && "incorrect dividend size");
   assert(divisor > 0 && "positive divisor expected");
 
-  appendId(IdKind::Local);
+  appendId(VarKind::Local);
 
   // Add two constraints for this new identifier 'q'.
   SmallVector<int64_t, 8> bound(dividend.size() + 1);
@@ -1729,9 +1729,9 @@ void IntegerRelation::fourierMotzkinEliminate(unsigned pos, bool darkShadow,
   }
 
   PresburgerSpace newSpace = getSpace();
-  IdKind idKindRemove = newSpace.getIdKindAt(pos);
-  unsigned relativePos = pos - newSpace.getIdKindOffset(idKindRemove);
-  newSpace.removeIdRange(idKindRemove, relativePos, relativePos + 1);
+  VarKind idKindRemove = newSpace.getVarKindAt(pos);
+  unsigned relativePos = pos - newSpace.getVarKindOffset(idKindRemove);
+  newSpace.removeVarRange(idKindRemove, relativePos, relativePos + 1);
 
   /// Create the new system which has one identifier less.
   IntegerRelation newRel(lbIndices.size() * ubIndices.size() + nbIndices.size(),
@@ -2077,12 +2077,12 @@ IntegerPolyhedron IntegerRelation::getDomainSet() const {
   IntegerRelation copyRel = *this;
 
   // Convert Range variables to Local variables.
-  copyRel.convertIdKind(IdKind::Range, 0, getNumIdKind(IdKind::Range),
-                        IdKind::Local);
+  copyRel.convertIdKind(VarKind::Range, 0, getNumIdKind(VarKind::Range),
+                        VarKind::Local);
 
   // Convert Domain variables to SetDim(Range) variables.
-  copyRel.convertIdKind(IdKind::Domain, 0, getNumIdKind(IdKind::Domain),
-                        IdKind::SetDim);
+  copyRel.convertIdKind(VarKind::Domain, 0, getNumIdKind(VarKind::Domain),
+                        VarKind::SetDim);
 
   return IntegerPolyhedron(std::move(copyRel));
 }
@@ -2091,8 +2091,8 @@ IntegerPolyhedron IntegerRelation::getRangeSet() const {
   IntegerRelation copyRel = *this;
 
   // Convert Domain variables to Local variables.
-  copyRel.convertIdKind(IdKind::Domain, 0, getNumIdKind(IdKind::Domain),
-                        IdKind::Local);
+  copyRel.convertIdKind(VarKind::Domain, 0, getNumIdKind(VarKind::Domain),
+                        VarKind::Local);
 
   // We do not need to do anything to Range variables since they are already in
   // SetDim position.
@@ -2109,7 +2109,7 @@ void IntegerRelation::intersectDomain(const IntegerPolyhedron &poly) {
   rel.inverse();
 
   // Append dummy range variables to make the spaces compatible.
-  rel.appendId(IdKind::Range, getNumRangeIds());
+  rel.appendId(VarKind::Range, getNumRangeIds());
 
   // Intersect in place.
   mergeLocalIds(rel);
@@ -2123,16 +2123,17 @@ void IntegerRelation::intersectRange(const IntegerPolyhedron &poly) {
   IntegerRelation rel = poly;
 
   // Append dummy domain variables to make the spaces compatible.
-  rel.appendId(IdKind::Domain, getNumDomainIds());
+  rel.appendId(VarKind::Domain, getNumDomainIds());
 
   mergeLocalIds(rel);
   append(rel);
 }
 
 void IntegerRelation::inverse() {
-  unsigned numRangeIds = getNumIdKind(IdKind::Range);
-  convertIdKind(IdKind::Domain, 0, getIdKindEnd(IdKind::Domain), IdKind::Range);
-  convertIdKind(IdKind::Range, 0, numRangeIds, IdKind::Domain);
+  unsigned numRangeIds = getNumIdKind(VarKind::Range);
+  convertIdKind(VarKind::Domain, 0, getIdKindEnd(VarKind::Domain),
+                VarKind::Range);
+  convertIdKind(VarKind::Range, 0, numRangeIds, VarKind::Domain);
 }
 
 void IntegerRelation::compose(const IntegerRelation &rel) {
@@ -2149,16 +2150,16 @@ void IntegerRelation::compose(const IntegerRelation &rel) {
   unsigned numBIds = getNumRangeIds();
 
   // Convert R1 from A -> B to A -> (B X C).
-  appendId(IdKind::Range, copyRel.getNumRangeIds());
+  appendId(VarKind::Range, copyRel.getNumRangeIds());
 
   // Convert R2 to B X C.
-  copyRel.convertIdKind(IdKind::Domain, 0, numBIds, IdKind::Range, 0);
+  copyRel.convertIdKind(VarKind::Domain, 0, numBIds, VarKind::Range, 0);
 
   // Intersect R2 to range of R1.
   intersectRange(IntegerPolyhedron(copyRel));
 
   // Project out B in R1.
-  convertIdKind(IdKind::Range, 0, numBIds, IdKind::Local);
+  convertIdKind(VarKind::Range, 0, numBIds, VarKind::Local);
 }
 
 void IntegerRelation::applyDomain(const IntegerRelation &rel) {
@@ -2194,8 +2195,8 @@ void IntegerRelation::print(raw_ostream &os) const {
 
 void IntegerRelation::dump() const { print(llvm::errs()); }
 
-unsigned IntegerPolyhedron::insertId(IdKind kind, unsigned pos, unsigned num) {
-  assert((kind != IdKind::Domain || num == 0) &&
+unsigned IntegerPolyhedron::insertId(VarKind kind, unsigned pos, unsigned num) {
+  assert((kind != VarKind::Domain || num == 0) &&
          "Domain has to be zero in a set");
   return IntegerRelation::insertId(kind, pos, num);
 }

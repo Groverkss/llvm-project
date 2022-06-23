@@ -43,8 +43,8 @@ static LogicalResult alignAndAddBound(FlatAffineValueConstraints &constraints,
                                       unsigned pos, AffineMap map,
                                       ValueRange operands) {
   SmallVector<Value> dims, syms, newSyms;
-  unpackOptionalValues(constraints.getMaybeValues(IdKind::SetDim), dims);
-  unpackOptionalValues(constraints.getMaybeValues(IdKind::Symbol), syms);
+  unpackOptionalValues(constraints.getMaybeValues(VarKind::SetDim), dims);
+  unpackOptionalValues(constraints.getMaybeValues(VarKind::Symbol), syms);
 
   AffineMap alignedMap =
       alignAffineMapWithValues(map, operands, dims, syms, &newSyms);

@@ -426,7 +426,7 @@ protected:
       : SimplexBase(nVar, /*mustUseBigM=*/true, symbolOffset, nSymbol) {}
   explicit LexSimplexBase(const IntegerRelation &constraints)
       : LexSimplexBase(constraints.getNumIds(),
-                       constraints.getIdKindOffset(IdKind::Symbol),
+                       constraints.getIdKindOffset(VarKind::Symbol),
                        constraints.getNumSymbolIds()) {
     intersectIntegerRelation(constraints);
   }

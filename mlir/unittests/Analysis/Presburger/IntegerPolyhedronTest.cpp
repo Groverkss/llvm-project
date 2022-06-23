@@ -183,17 +183,17 @@ TEST(IntegerPolyhedronTest, removeIdRange) {
   IntegerPolyhedron set(PresburgerSpace::getSetSpace(3, 2, 1));
 
   set.addInequality({10, 11, 12, 20, 21, 30, 40});
-  set.removeId(IdKind::Symbol, 1);
+  set.removeId(VarKind::Symbol, 1);
   EXPECT_THAT(set.getInequality(0),
               testing::ElementsAre(10, 11, 12, 20, 30, 40));
 
-  set.removeIdRange(IdKind::SetDim, 0, 2);
+  set.removeIdRange(VarKind::SetDim, 0, 2);
   EXPECT_THAT(set.getInequality(0), testing::ElementsAre(12, 20, 30, 40));
 
-  set.removeIdRange(IdKind::Local, 1, 1);
+  set.removeIdRange(VarKind::Local, 1, 1);
   EXPECT_THAT(set.getInequality(0), testing::ElementsAre(12, 20, 30, 40));
 
-  set.removeIdRange(IdKind::Local, 0, 1);
+  set.removeIdRange(VarKind::Local, 0, 1);
   EXPECT_THAT(set.getInequality(0), testing::ElementsAre(12, 20, 40));
 }
 
@@ -709,7 +709,7 @@ TEST(IntegerPolyhedronTest, computeLocalReprTightUpperBound) {
     IntegerPolyhedron poly =
         parsePoly("(i, j, q) : (4*q - i - j + 2 >= 0, -4*q + i + j >= 0)");
     // Convert `q` to a local variable.
-    poly.convertToLocal(IdKind::SetDim, 2, 3);
+    poly.convertToLocal(VarKind::SetDim, 2, 3);
 
     std::vector<SmallVector<int64_t, 8>> divisions = {{1, 1, 0, 1}};
     SmallVector<unsigned, 8> denoms = {4};
@@ -723,7 +723,7 @@ TEST(IntegerPolyhedronTest, computeLocalReprFromEquality) {
   {
     IntegerPolyhedron poly = parsePoly("(i, j, q) : (-4*q + i + j == 0)");
     // Convert `q` to a local variable.
-    poly.convertToLocal(IdKind::SetDim, 2, 3);
+    poly.convertToLocal(VarKind::SetDim, 2, 3);
 
     std::vector<SmallVector<int64_t, 8>> divisions = {{-1, -1, 0, 0}};
     SmallVector<unsigned, 8> denoms = {4};
@@ -733,7 +733,7 @@ TEST(IntegerPolyhedronTest, computeLocalReprFromEquality) {
   {
     IntegerPolyhedron poly = parsePoly("(i, j, q) : (4*q - i - j == 0)");
     // Convert `q` to a local variable.
-    poly.convertToLocal(IdKind::SetDim, 2, 3);
+    poly.convertToLocal(VarKind::SetDim, 2, 3);
 
     std::vector<SmallVector<int64_t, 8>> divisions = {{-1, -1, 0, 0}};
     SmallVector<unsigned, 8> denoms = {4};
@@ -743,7 +743,7 @@ TEST(IntegerPolyhedronTest, computeLocalReprFromEquality) {
   {
     IntegerPolyhedron poly = parsePoly("(i, j, q) : (3*q + i + j - 2 == 0)");
     // Convert `q` to a local variable.
-    poly.convertToLocal(IdKind::SetDim, 2, 3);
+    poly.convertToLocal(VarKind::SetDim, 2, 3);
 
     std::vector<SmallVector<int64_t, 8>> divisions = {{1, 1, 0, -2}};
     SmallVector<unsigned, 8> denoms = {3};
@@ -758,7 +758,7 @@ TEST(IntegerPolyhedronTest, computeLocalReprFromEqualityAndInequality) {
         parsePoly("(i, j, q, k) : (-3*k + i + j == 0, 4*q - "
                   "i - j + 2 >= 0, -4*q + i + j >= 0)");
     // Convert `q` and `k` to local variables.
-    poly.convertToLocal(IdKind::SetDim, 2, 4);
+    poly.convertToLocal(VarKind::SetDim, 2, 4);
 
     std::vector<SmallVector<int64_t, 8>> divisions = {{1, 1, 0, 0, 1},
                                                       {-1, -1, 0, 0, 0}};
@@ -772,7 +772,7 @@ TEST(IntegerPolyhedronTest, computeLocalReprNoRepr) {
   IntegerPolyhedron poly =
       parsePoly("(x, q) : (x - 3 * q >= 0, -x + 3 * q + 3 >= 0)");
   // Convert q to a local variable.
-  poly.convertToLocal(IdKind::SetDim, 1, 2);
+  poly.convertToLocal(VarKind::SetDim, 1, 2);
 
   std::vector<SmallVector<int64_t, 8>> divisions = {{0, 0, 0}};
   SmallVector<unsigned, 8> denoms = {0};
@@ -785,7 +785,7 @@ TEST(IntegerPolyhedronTest, computeLocalReprNegConstNormalize) {
   IntegerPolyhedron poly =
       parsePoly("(x, q) : (-1 - 3*x - 6 * q >= 0, 6 + 3*x + 6*q >= 0)");
   // Convert q to a local variable.
-  poly.convertToLocal(IdKind::SetDim, 1, 2);
+  poly.convertToLocal(VarKind::SetDim, 1, 2);
 
   // q = floor((-1/3 - x)/2)
   //   = floor((1/3) + (-1 - x)/2)
@@ -833,7 +833,7 @@ TEST(IntegerPolyhedronTest, mergeDivisionsSimple) {
     IntegerPolyhedron poly2(PresburgerSpace::getSetSpace(1));
     poly2.addLocalFloorDiv({1, 0}, 2); // y = [x / 2].
     poly2.addEquality({1, -5, 0});     // x = 5y.
-    poly2.appendId(IdKind::Local);     // Add local id z.
+    poly2.appendId(VarKind::Local);     // Add local id z.
 
     poly1.mergeLocalIds(poly2);
 
@@ -881,7 +881,7 @@ TEST(IntegerPolyhedronTest, mergeDivisionsSimple) {
     IntegerPolyhedron poly2(PresburgerSpace::getSetSpace(1));
     poly2.addLocalFloorDiv({1, 0}, 2); // y = [x / 2].
     poly2.addEquality({1, -5, 0});     // x = 5y.
-    poly2.appendId(IdKind::Local);     // Add local id z.
+    poly2.appendId(VarKind::Local);     // Add local id z.
 
     poly1.mergeLocalIds(poly2);
 

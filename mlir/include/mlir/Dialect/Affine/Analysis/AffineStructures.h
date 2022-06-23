@@ -230,7 +230,7 @@ public:
 
   /// Gets the lower and upper bound of the `offset` + `pos`th identifier
   /// treating [0, offset) U [offset + num, symStartPos) as dimensions and
-  /// [symStartPos, getNumDimAndSymbolIds) as symbols, and `pos` lies in
+  /// [symStartPos, getNumDimAndSymbolVars) as symbols, and `pos` lies in
   /// [0, num). The multi-dimensional maps in the returned pair represent the
   /// max and min of potentially multiple affine expressions. The upper bound is
   /// exclusive. `localExprs` holds pre-computed AffineExpr's for all local
@@ -276,7 +276,7 @@ public:
   /// relative to the kind of identifier. The coefficient columns corresponding
   /// to the added identifiers are initialized to zero. `vals` are the Values
   /// corresponding to the identifiers. Values should not be used with
-  /// IdKind::Local since values can only be attached to non-local identifiers.
+  /// VarKind::Local since values can only be attached to non-local identifiers.
   /// Return the absolute column position (i.e., not relative to the kind of
   /// identifier) of the first added identifier.
   ///
@@ -292,9 +292,9 @@ public:
   }
   unsigned insertDimId(unsigned pos, ValueRange vals);
   unsigned insertSymbolId(unsigned pos, ValueRange vals);
-  unsigned insertId(presburger::IdKind kind, unsigned pos,
+  unsigned insertId(presburger::VarKind kind, unsigned pos,
                     unsigned num = 1) override;
-  unsigned insertId(presburger::IdKind kind, unsigned pos, ValueRange vals);
+  unsigned insertId(presburger::VarKind kind, unsigned pos, ValueRange vals);
 
   /// Append identifiers of the specified kind after the last identifier of that
   /// kind. The coefficient columns corresponding to the added identifiers are
@@ -317,7 +317,7 @@ public:
   /// Removes identifiers in the column range [idStart, idLimit), and copies any
   /// remaining valid data into place, updates member variables, and resizes
   /// arrays as needed.
-  void removeIdRange(presburger::IdKind kind, unsigned idStart,
+  void removeIdRange(presburger::VarKind kind, unsigned idStart,
                      unsigned idLimit) override;
   using IntegerPolyhedron::removeIdRange;
 
@@ -432,7 +432,7 @@ public:
   }
 
   inline ArrayRef<Optional<Value>>
-  getMaybeValues(presburger::IdKind kind) const {
+  getMaybeValues(presburger::VarKind kind) const {
     assert(kind != IdKind::Local &&
            "Local identifiers do not have any value attached to them.");
     return {values.data() + getIdKindOffset(kind), getNumIdKind(kind)};
@@ -462,7 +462,7 @@ public:
   void mergeSymbolIds(FlatAffineValueConstraints &other);
 
 protected:
-  using IdKind = presburger::IdKind;
+  using IdKind = presburger::VarKind;
 
   /// Returns false if the fields corresponding to various identifier counts, or
   /// equality/inequality buffer sizes aren't consistent; true otherwise. This

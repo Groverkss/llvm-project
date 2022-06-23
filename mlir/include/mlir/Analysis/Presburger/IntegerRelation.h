@@ -44,8 +44,8 @@ class IntegerPolyhedron;
 ///         (x, y) : (1 <= x <= 7, x = 2y)
 /// This relation contains the pairs (2, 1), (4, 2), and (6, 3).
 ///
-/// Since IntegerRelation makes a distinction between dimensions, IdKind::Range
-/// and IdKind::Domain should be used to refer to dimension identifiers.
+/// Since IntegerRelation makes a distinction between dimensions, VarKind::Range
+/// and VarKind::Domain should be used to refer to dimension identifiers.
 class IntegerRelation {
 public:
   /// All derived classes of IntegerRelation.
@@ -61,18 +61,18 @@ public:
   IntegerRelation(unsigned numReservedInequalities,
                   unsigned numReservedEqualities, unsigned numReservedCols,
                   const PresburgerSpace &space)
-      : space(space), equalities(0, space.getNumIds() + 1,
+      : space(space), equalities(0, space.getNumVars() + 1,
                                  numReservedEqualities, numReservedCols),
-        inequalities(0, space.getNumIds() + 1, numReservedInequalities,
+        inequalities(0, space.getNumVars() + 1, numReservedInequalities,
                      numReservedCols) {
-    assert(numReservedCols >= space.getNumIds() + 1);
+    assert(numReservedCols >= space.getNumVars() + 1);
   }
 
   /// Constructs a relation with the specified number of dimensions and symbols.
   explicit IntegerRelation(const PresburgerSpace &space)
       : IntegerRelation(/*numReservedInequalities=*/0,
                         /*numReservedEqualities=*/0,
-                        /*numReservedCols=*/space.getNumIds() + 1, space) {}
+                        /*numReservedCols=*/space.getNumVars() + 1, space) {}
 
   virtual ~IntegerRelation() = default;
 
@@ -95,9 +95,9 @@ public:
 
   /// Returns a copy of the space without locals.
   PresburgerSpace getSpaceWithoutLocals() const {
-    return PresburgerSpace::getRelationSpace(space.getNumDomainIds(),
-                                             space.getNumRangeIds(),
-                                             space.getNumSymbolIds());
+    return PresburgerSpace::getRelationSpace(space.getNumDomainVars(),
+                                             space.getNumRangeVars(),
+                                             space.getNumSymbolVars());
   }
 
   /// Appends constraints from `other` into `this`. This is equivalent to an
@@ -132,19 +132,19 @@ public:
     return getNumInequalities() + getNumEqualities();
   }
 
-  unsigned getNumDomainIds() const { return space.getNumDomainIds(); }
-  unsigned getNumRangeIds() const { return space.getNumRangeIds(); }
-  unsigned getNumSymbolIds() const { return space.getNumSymbolIds(); }
-  unsigned getNumLocalIds() const { return space.getNumLocalIds(); }
+  unsigned getNumDomainIds() const { return space.getNumDomainVars(); }
+  unsigned getNumRangeIds() const { return space.getNumRangeVars(); }
+  unsigned getNumSymbolIds() const { return space.getNumSymbolVars(); }
+  unsigned getNumLocalIds() const { return space.getNumLocalVars(); }
 
-  unsigned getNumDimIds() const { return space.getNumDimIds(); }
+  unsigned getNumDimIds() const { return space.getNumDimVars(); }
   unsigned getNumDimAndSymbolIds() const {
-    return space.getNumDimAndSymbolIds();
+    return space.getNumDimAndSymbolVars();
   }
-  unsigned getNumIds() const { return space.getNumIds(); }
+  unsigned getNumIds() const { return space.getNumVars(); }
 
   /// Returns the number of columns in the constraint system.
-  inline unsigned getNumCols() const { return space.getNumIds() + 1; }
+  inline unsigned getNumCols() const { return space.getNumVars() + 1; }
 
   inline unsigned getNumEqualities() const { return equalities.getNumRows(); }
 
@@ -169,30 +169,30 @@ public:
   }
 
   /// Get the number of ids of the specified kind.
-  unsigned getNumIdKind(IdKind kind) const { return space.getNumIdKind(kind); };
+  unsigned getNumIdKind(VarKind kind) const { return space.getNumVarKind(kind); };
 
   /// Return the index at which the specified kind of id starts.
-  unsigned getIdKindOffset(IdKind kind) const {
-    return space.getIdKindOffset(kind);
+  unsigned getIdKindOffset(VarKind kind) const {
+    return space.getVarKindOffset(kind);
   };
 
   /// Return the index at Which the specified kind of id ends.
-  unsigned getIdKindEnd(IdKind kind) const { return space.getIdKindEnd(kind); };
+  unsigned getIdKindEnd(VarKind kind) const { return space.getVarKindEnd(kind); };
 
   /// Get the number of elements of the specified kind in the range
   /// [idStart, idLimit).
-  unsigned getIdKindOverlap(IdKind kind, unsigned idStart,
+  unsigned getIdKindOverlap(VarKind kind, unsigned idStart,
                             unsigned idLimit) const {
-    return space.getIdKindOverlap(kind, idStart, idLimit);
+    return space.getVarKindOverlap(kind, idStart, idLimit);
   };
 
-  /// Return the IdKind of the id at the specified position.
-  IdKind getIdKindAt(unsigned pos) const { return space.getIdKindAt(pos); };
+  /// Return the VarKind of the id at the specified position.
+  VarKind getIdKindAt(unsigned pos) const { return space.getVarKindAt(pos); };
 
-  /// The struct CountsSnapshot stores the count of each IdKind, and also of
+  /// The struct CountsSnapshot stores the count of each VarKind, and also of
   /// each constraint type. getCounts() returns a CountsSnapshot object
   /// describing the current state of the IntegerRelation. truncate() truncates
-  /// all ids of each IdKind and all constraints of both kinds beyond the counts
+  /// all ids of each VarKind and all constraints of both kinds beyond the counts
   /// in the specified CountsSnapshot object. This can be used to achieve
   /// rudimentary rollback support. As long as none of the existing constraints
   /// or ids are disturbed, and only additional ids or constraints are added,
@@ -218,13 +218,13 @@ public:
   /// corresponding to the added identifiers are initialized to zero. Return the
   /// absolute column position (i.e., not relative to the kind of identifier)
   /// of the first added identifier.
-  virtual unsigned insertId(IdKind kind, unsigned pos, unsigned num = 1);
+  virtual unsigned insertId(VarKind kind, unsigned pos, unsigned num = 1);
 
   /// Append `num` identifiers of the specified kind after the last identifier.
   /// of that kind. Return the position of the first appended column relative to
   /// the kind of identifier. The coefficient columns corresponding to the added
   /// identifiers are initialized to zero.
-  unsigned appendId(IdKind kind, unsigned num = 1);
+  unsigned appendId(VarKind kind, unsigned num = 1);
 
   /// Adds an inequality (>= 0) from the coefficients specified in `inEq`.
   void addInequality(ArrayRef<int64_t> inEq);
@@ -239,8 +239,8 @@ public:
   /// Removes identifiers of the specified kind with the specified pos (or
   /// within the specified range) from the system. The specified location is
   /// relative to the first identifier of the specified kind.
-  void removeId(IdKind kind, unsigned pos);
-  virtual void removeIdRange(IdKind kind, unsigned idStart, unsigned idLimit);
+  void removeId(VarKind kind, unsigned pos);
+  virtual void removeIdRange(VarKind kind, unsigned idStart, unsigned idLimit);
 
   /// Removes the specified identifier from the system.
   void removeId(unsigned pos);
@@ -463,14 +463,14 @@ public:
   /// position `pos` of dstKind, otherwise they are placed after all the other
   /// variables of kind dstKind. The internal ordering among the moved variables
   /// is preserved.
-  void convertIdKind(IdKind srcKind, unsigned idStart, unsigned idLimit,
-                     IdKind dstKind, unsigned pos);
-  void convertIdKind(IdKind srcKind, unsigned idStart, unsigned idLimit,
-                     IdKind dstKind) {
+  void convertIdKind(VarKind srcKind, unsigned idStart, unsigned idLimit,
+                     VarKind dstKind, unsigned pos);
+  void convertIdKind(VarKind srcKind, unsigned idStart, unsigned idLimit,
+                     VarKind dstKind) {
     convertIdKind(srcKind, idStart, idLimit, dstKind, getNumIdKind(dstKind));
   }
-  void convertToLocal(IdKind kind, unsigned idStart, unsigned idLimit) {
-    convertIdKind(kind, idStart, idLimit, IdKind::Local);
+  void convertToLocal(VarKind kind, unsigned idStart, unsigned idLimit) {
+    convertIdKind(kind, idStart, idLimit, VarKind::Local);
   }
 
   /// Adds additional local ids to the sets such that they both have the union
@@ -502,7 +502,7 @@ public:
   /// the split become symbols, or some of the symbols immediately after the
   /// split become dimensions.
   void setDimSymbolSeparation(unsigned newSymbolCount) {
-    space.setDimSymbolSeparation(newSymbolCount);
+    space.setVarSymbolSeperation(newSymbolCount);
   }
 
   /// Return a set corresponding to all points in the domain of the relation.
@@ -637,11 +637,11 @@ protected:
 
   /// Truncate the ids of the specified kind to the specified number by dropping
   /// some ids at the end. `num` must be less than the current number.
-  void truncateIdKind(IdKind kind, unsigned num);
+  void truncateIdKind(VarKind kind, unsigned num);
 
   /// Truncate the ids to the number in the space of the specified
   /// CountsSnapshot.
-  void truncateIdKind(IdKind kind, const CountsSnapshot &counts);
+  void truncateIdKind(VarKind kind, const CountsSnapshot &counts);
 
   /// A parameter that controls detection of an unrealistic number of
   /// constraints. If the number of constraints is this many times the number of
@@ -681,7 +681,7 @@ struct SymbolicLexMin;
 /// IntegerPolyhedron is implemented as a IntegerRelation with zero domain ids.
 ///
 /// Since IntegerPolyhedron does not make a distinction between kinds of
-/// dimensions, IdKind::SetDim should be used to refer to dimension identifiers.
+/// dimensions, VarKind::SetDim should be used to refer to dimension identifiers.
 class IntegerPolyhedron : public IntegerRelation {
 public:
   /// Constructs a set reserving memory for the specified number
@@ -691,7 +691,7 @@ public:
                     const PresburgerSpace &space)
       : IntegerRelation(numReservedInequalities, numReservedEqualities,
                         numReservedCols, space) {
-    assert(space.getNumDomainIds() == 0 &&
+    assert(space.getNumDomainVars() == 0 &&
            "Number of domain id's should be zero in Set kind space.");
   }
 
@@ -700,20 +700,20 @@ public:
   explicit IntegerPolyhedron(const PresburgerSpace &space)
       : IntegerPolyhedron(/*numReservedInequalities=*/0,
                           /*numReservedEqualities=*/0,
-                          /*numReservedCols=*/space.getNumIds() + 1, space) {}
+                          /*numReservedCols=*/space.getNumVars() + 1, space) {}
 
   /// Construct a set from an IntegerRelation. The relation should have
   /// no domain ids.
   explicit IntegerPolyhedron(const IntegerRelation &rel)
       : IntegerRelation(rel) {
-    assert(space.getNumDomainIds() == 0 &&
+    assert(space.getNumDomainVars() == 0 &&
            "Number of domain id's should be zero in Set kind space.");
   }
 
   /// Construct a set from an IntegerRelation, but instead of creating a copy,
   /// use move constructor. The relation should have no domain ids.
   explicit IntegerPolyhedron(IntegerRelation &&rel) : IntegerRelation(rel) {
-    assert(space.getNumDomainIds() == 0 &&
+    assert(space.getNumDomainVars() == 0 &&
            "Number of domain id's should be zero in Set kind space.");
   }
 
@@ -737,7 +737,7 @@ public:
   /// Positions are relative to the kind of identifier. Return the absolute
   /// column position (i.e., not relative to the kind of identifier) of the
   /// first added identifier.
-  unsigned insertId(IdKind kind, unsigned pos, unsigned num = 1) override;
+  unsigned insertId(VarKind kind, unsigned pos, unsigned num = 1) override;
 
   /// Compute the symbolic integer lexmin of the polyhedron.
   /// This finds, for every assignment to the symbols, the lexicographically

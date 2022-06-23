@@ -44,11 +44,11 @@ public:
 
   explicit PresburgerRelation(const IntegerRelation &disjunct);
 
-  unsigned getNumDomainIds() const { return space.getNumDomainIds(); }
-  unsigned getNumRangeIds() const { return space.getNumRangeIds(); }
-  unsigned getNumSymbolIds() const { return space.getNumSymbolIds(); }
-  unsigned getNumLocalIds() const { return space.getNumLocalIds(); }
-  unsigned getNumIds() const { return space.getNumIds(); }
+  unsigned getNumDomainIds() const { return space.getNumDomainVars(); }
+  unsigned getNumRangeIds() const { return space.getNumRangeVars(); }
+  unsigned getNumSymbolIds() const { return space.getNumSymbolVars(); }
+  unsigned getNumLocalIds() const { return space.getNumLocalVars(); }
+  unsigned getNumIds() const { return space.getNumVars(); }
 
   /// Return the number of disjuncts in the union.
   unsigned getNumDisjuncts() const;
@@ -125,7 +125,7 @@ protected:
   /// Construct an empty PresburgerRelation with the specified number of
   /// dimension and symbols.
   explicit PresburgerRelation(const PresburgerSpace &space) : space(space) {
-    assert(space.getNumLocalIds() == 0 &&
+    assert(space.getNumLocalVars() == 0 &&
            "PresburgerRelation cannot have local ids.");
   }
 
@@ -163,8 +163,8 @@ protected:
   /// dimension and symbols.
   explicit PresburgerSet(const PresburgerSpace &space)
       : PresburgerRelation(space) {
-    assert(space.getNumDomainIds() == 0 && "Set type cannot have domain ids.");
-    assert(space.getNumLocalIds() == 0 &&
+    assert(space.getNumDomainVars() == 0 && "Set type cannot have domain ids.");
+    assert(space.getNumLocalVars() == 0 &&
            "PresburgerRelation cannot have local ids.");
   }
 };

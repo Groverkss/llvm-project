@@ -62,10 +62,10 @@ public:
   /// corresponding to the added identifiers are initialized to zero. Return the
   /// absolute column position (i.e., not relative to the kind of identifier)
   /// of the first added identifier.
-  unsigned insertId(IdKind kind, unsigned pos, unsigned num = 1);
+  unsigned insertId(VarKind kind, unsigned pos, unsigned num = 1);
 
   /// Remove the specified range of ids.
-  void removeIdRange(IdKind kind, unsigned idStart, unsigned idLimit);
+  void removeIdRange(VarKind kind, unsigned idStart, unsigned idLimit);
 
   /// Given a MAF `other`, merges local identifiers such that both funcitons
   /// have union of local ids, without changing the set of points in domain or
@@ -88,7 +88,7 @@ public:
 
   /// Truncate the output dimensions to the first `count` dimensions.
   ///
-  /// TODO: refactor so that this can be accomplished through removeIdRange.
+  /// TODO: refactor so that this can be accomplished through removeVarRange.
   void truncateOutput(unsigned count);
 
   void print(raw_ostream &os) const;
@@ -127,9 +127,9 @@ class PWMAFunction {
 public:
   PWMAFunction(const PresburgerSpace &space, unsigned numOutputs)
       : space(space), numOutputs(numOutputs) {
-    assert(space.getNumDomainIds() == 0 &&
+    assert(space.getNumDomainVars() == 0 &&
            "Set type space should have zero domain ids.");
-    assert(space.getNumLocalIds() == 0 &&
+    assert(space.getNumLocalVars() == 0 &&
            "PWMAFunction cannot have local ids.");
     assert(numOutputs >= 1 && "The function must output something!");
   }
@@ -142,7 +142,7 @@ public:
   const MultiAffineFunction &getPiece(unsigned i) const { return pieces[i]; }
   unsigned getNumPieces() const { return pieces.size(); }
   unsigned getNumOutputs() const { return numOutputs; }
-  unsigned getNumInputs() const { return space.getNumIds(); }
+  unsigned getNumInputs() const { return space.getNumVars(); }
   MultiAffineFunction &getPiece(unsigned i) { return pieces[i]; }
 
   /// Return the domain of this piece-wise MultiAffineFunction. This is the
@@ -160,7 +160,7 @@ public:
 
   /// Truncate the output dimensions to the first `count` dimensions.
   ///
-  /// TODO: refactor so that this can be accomplished through removeIdRange.
+  /// TODO: refactor so that this can be accomplished through removeVarRange.
   void truncateOutput(unsigned count);
 
   void print(raw_ostream &os) const;
