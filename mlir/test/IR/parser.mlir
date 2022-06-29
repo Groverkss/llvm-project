@@ -31,13 +31,13 @@
 // CHECK-NOT: Placeholder
 
 // CHECK-DAG: #set{{[0-9]+}} = affine_set<(d0)[s0, s1] : (d0 >= 0, -d0 + s0 >= 0, s0 - 5 == 0, -d0 + s1 + 1 >= 0)>
-#set0 = affine_set<(i)[N, M] : (i >= 0, -i + N >= 0, N - 5 == 0, -i + M + 1 >= 0)>
+#set0 = affine_set<(i)[N, M] : (i >= 0, N >= i, N == 5, M + 1 >= i)>
 
 // CHECK-DAG: #set{{[0-9]+}} = affine_set<(d0, d1)[s0] : (d0 >= 0, d1 >= 0)>
 #set1 = affine_set<(d0, d1)[s0] : (d0 >= 0, d1 >= 0)>
 
 // CHECK-DAG: #set{{[0-9]+}} = affine_set<(d0) : (d0 - 1 == 0)>
-#set2 = affine_set<(d0) : (d0 - 1 == 0)>
+#set2 = affine_set<(d0) : (d0 == 1)>
 
 // CHECK-DAG: [[$SET_TRUE:#set[0-9]+]] = affine_set<() : (0 == 0)>
 
