@@ -292,14 +292,6 @@ func.func @invalid_if_conditional2() {
 
 // -----
 
-func.func @invalid_if_conditional5() {
-  affine.for %i = 1 to 10 {
-    affine.if affine_set<(i)[N] : (i <= 0)> // expected-error {{expected '== affine-expr' or '>= affine-expr' at end of affine constraint}}
-  }
-}
-
-// -----
-
 func.func @invalid_if_conditional6() {
   affine.for %i = 1 to 10 {
     affine.if affine_set<(i) : (i)> // expected-error {{expected '== affine-expr' or '>= affine-expr' at end of affine constraint}}

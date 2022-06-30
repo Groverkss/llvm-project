@@ -47,3 +47,31 @@
 
 // CHECK-DAG: "testset5"() {set = #set{{[0-9]+}}} : () -> ()
 "testset5"() {set = #set5} : () -> ()
+
+// ---
+
+// Check if affine constraints with `<=` can be parsed.
+
+// CHECK-DAG: #set{{[0-9]+}} = affine_set<(d0)[s0] : (d0 >= 0, -d0 + s0 >= 0)>
+#set6 = affine_set<(i)[N] : (i >= 0, i <= N)>
+
+// CHECK-DAG: "testset6"() {set = #set{{[0-9]+}}} : () -> ()
+"testset6"() {set = #set6} : () -> ()
+
+// ---
+
+// CHECK-DAG: #set{{[0-9]+}} = affine_set<(d0, d1)[s0] : (d0 >= 0, -d0 + s0 >= 0, d1 - d0 >= 0, -d1 + s0 >= 0)>
+#set7 = affine_set<(i, j)[N] : (i >= 0, i <= N, j >= i, j <= N)>
+
+// CHECK-DAG: "testset7"() {set = #set{{[0-9]+}}} : () -> ()
+"testset7"() {set = #set7} : () -> ()
+
+// ---
+
+// CHECK-DAG: #set{{[0-9]+}} = affine_set<(d0, d1, d2, d3)[s0, s1] : (d0 >= 0, -d0 + s0 floordiv 64 - 1 >= 0, d2 >= 0, -d2 + s1 floordiv 64 - 1 >= 0, d1 >= 0, -d1 + 63 >= 0, d3 >= 0, -d3 + 63 >= 0)>
+#set8 = affine_set<(i0, i1, j0, j1)[N, M] : (i0 >= 0, i0 <= (N floordiv 64) - 1, j0 >= 0, j0 <= (M floordiv 64) - 1, i1 >= 0, i1 <= 63, j1 >= 0, j1 <= 63)>
+
+// CHECK-DAG: "testset8"() {set = #set{{[0-9]+}}} : () -> ()
+"testset8"() {set = #set8} : () -> ()
+
+// ---
