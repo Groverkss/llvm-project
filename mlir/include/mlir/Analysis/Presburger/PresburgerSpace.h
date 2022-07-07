@@ -55,9 +55,6 @@ enum class VarKind { Symbol, Local, Domain, Range, SetDim = Range };
 /// Dimension variables are further divided into Domain and Range variables
 /// to support building relations.
 ///
-/// Variables are stored in the following order:
-///       [Domain, Range, Symbols, Locals]
-///
 /// A space with no distinction between types of dimension variables can
 /// be implemented as a space with zero domain. VarKind::SetDim should be used
 /// to refer to dimensions in such spaces.
@@ -106,20 +103,6 @@ public:
 
   /// Get the number of vars of the specified kind.
   unsigned getNumVarKind(VarKind kind) const;
-
-  /// Return the index at which the specified kind of var starts.
-  unsigned getVarKindOffset(VarKind kind) const;
-
-  /// Return the index at Which the specified kind of var ends.
-  unsigned getVarKindEnd(VarKind kind) const;
-
-  /// Get the number of elements of the specified kind in the range
-  /// [varStart, varLimit).
-  unsigned getVarKindOverlap(VarKind kind, unsigned varStart,
-                             unsigned varLimit) const;
-
-  /// Return the VarKind of the var at the specified position.
-  VarKind getVarKindAt(unsigned pos) const;
 
   /// Insert `num` variables of the specified kind at position `pos`.
   /// Positions are relative to the kind of variable. Return the absolute
@@ -227,6 +210,20 @@ public:
   }
 
 protected:
+  /// Return the index at Which the specified kind of var ends.
+  unsigned getVarKindEnd(VarKind kind) const;
+
+  /// Get the number of elements of the specified kind in the range
+  /// [varStart, varLimit).
+  unsigned getVarKindOverlap(VarKind kind, unsigned varStart,
+                             unsigned varLimit) const;
+
+  /// Return the VarKind of the var at the specified position.
+  VarKind getVarKindAt(unsigned pos) const;
+
+  /// Return the index at which the specified kind of var starts.
+  unsigned getVarKindOffset(VarKind kind) const;
+
   PresburgerSpace(unsigned numDomain = 0, unsigned numRange = 0,
                   unsigned numSymbols = 0, unsigned numLocals = 0)
       : numDomain(numDomain), numRange(numRange), numSymbols(numSymbols),

@@ -51,6 +51,51 @@ void IntegerRelation::setSpaceExceptLocals(const PresburgerSpace &oSpace) {
   space.insertVar(VarKind::Local, 0, newNumLocals);
 }
 
+unsigned IntegerRelation::getVarKindOffset(VarKind kind) const {
+  switch (kind) {
+  case VarKind::Domain:
+    return 0;
+  case VarKind::Range:
+    return getNumDomainVars();
+  case VarKind::Symbol:
+    return getNumDimVars();
+  case VarKind::Local:
+    return getNumDimAndSymbolVars();
+  }
+}
+
+unsigned IntegerRelation::getVarKindEnd(VarKind kind) const {
+  return getVarKindOffset(kind) + getNumVarKind(kind);
+}
+
+unsigned IntegerRelation::getVarKindOverlap(VarKind kind, unsigned varStart,
+                                            unsigned varLimit) const {
+  unsigned varRangeStart = getVarKindOffset(kind);
+  unsigned varRangeEnd = getVarKindEnd(kind);
+
+  // Compute number of elements in intersection of the ranges [varStart,
+  // varLimit) and [varRangeStart, varRangeEnd).
+  unsigned overlapStart = std::max(varStart, varRangeStart);
+  unsigned overlapEnd = std::min(varLimit, varRangeEnd);
+
+  if (overlapStart > overlapEnd)
+    return 0;
+  return overlapEnd - overlapStart;
+}
+
+VarKind IntegerRelation::getVarKindAt(unsigned pos) const {
+  assert(pos < getNumVars() && "`pos` should represent a valid var position");
+  if (pos < getVarKindEnd(VarKind::Domain))
+    return VarKind::Domain;
+  if (pos < getVarKindEnd(VarKind::Range))
+    return VarKind::Range;
+  if (pos < getVarKindEnd(VarKind::Symbol))
+    return VarKind::Symbol;
+  if (pos < getVarKindEnd(VarKind::Local))
+    return VarKind::Local;
+  llvm_unreachable("`pos` should represent a valid var position");
+}
+
 void IntegerRelation::append(const IntegerRelation &other) {
   assert(space.isEqual(other.getSpace()) && "Spaces must be equal.");
 
@@ -1792,8 +1837,8 @@ void IntegerRelation::fourierMotzkinEliminate(unsigned pos, bool darkShadow,
   }
 
   PresburgerSpace newSpace = getSpace();
-  VarKind idKindRemove = newSpace.getVarKindAt(pos);
-  unsigned relativePos = pos - newSpace.getVarKindOffset(idKindRemove);
+  VarKind idKindRemove = getVarKindAt(pos);
+  unsigned relativePos = pos - getVarKindOffset(idKindRemove);
   newSpace.removeVarRange(idKindRemove, relativePos, relativePos + 1);
 
   /// Create the new system which has one variable less.

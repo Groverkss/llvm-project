@@ -14,27 +14,29 @@ using namespace mlir;
 using namespace presburger;
 
 unsigned PresburgerSpace::getNumVarKind(VarKind kind) const {
-  if (kind == VarKind::Domain)
+  switch (kind) {
+  case VarKind::Domain:
     return getNumDomainVars();
-  if (kind == VarKind::Range)
+  case VarKind::Range:
     return getNumRangeVars();
-  if (kind == VarKind::Symbol)
+  case VarKind::Symbol:
     return getNumSymbolVars();
-  if (kind == VarKind::Local)
-    return numLocals;
-  llvm_unreachable("VarKind does not exist!");
+  case VarKind::Local:
+    return getNumLocalVars();
+  }
 }
 
 unsigned PresburgerSpace::getVarKindOffset(VarKind kind) const {
-  if (kind == VarKind::Domain)
+  switch (kind) {
+  case VarKind::Domain:
     return 0;
-  if (kind == VarKind::Range)
+  case VarKind::Range:
     return getNumDomainVars();
-  if (kind == VarKind::Symbol)
+  case VarKind::Symbol:
     return getNumDimVars();
-  if (kind == VarKind::Local)
+  case VarKind::Local:
     return getNumDimAndSymbolVars();
-  llvm_unreachable("VarKind does not exist!");
+  }
 }
 
 unsigned PresburgerSpace::getVarKindEnd(VarKind kind) const {

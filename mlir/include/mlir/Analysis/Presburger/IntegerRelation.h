@@ -47,6 +47,9 @@ struct SymbolicLexMin;
 ///         (x, y) : (1 <= x <= 7, x = 2y)
 /// This relation contains the pairs (2, 1), (4, 2), and (6, 3).
 ///
+/// Variables are stored in the following order:
+///       [Domain, Range, Symbols, Locals]
+///
 /// Since IntegerRelation makes a distinction between dimensions, VarKind::Range
 /// and VarKind::Domain should be used to refer to dimension variables.
 class IntegerRelation {
@@ -188,24 +191,18 @@ public:
   };
 
   /// Return the index at which the specified kind of vars starts.
-  unsigned getVarKindOffset(VarKind kind) const {
-    return space.getVarKindOffset(kind);
-  };
+  unsigned getVarKindOffset(VarKind kind) const;
 
   /// Return the index at Which the specified kind of vars ends.
-  unsigned getVarKindEnd(VarKind kind) const {
-    return space.getVarKindEnd(kind);
-  };
+  unsigned getVarKindEnd(VarKind kind) const;
 
   /// Get the number of elements of the specified kind in the range
   /// [varStart, varLimit).
   unsigned getVarKindOverlap(VarKind kind, unsigned varStart,
-                             unsigned varLimit) const {
-    return space.getVarKindOverlap(kind, varStart, varLimit);
-  };
+                             unsigned varLimit) const;
 
   /// Return the VarKind of the var at the specified position.
-  VarKind getVarKindAt(unsigned pos) const { return space.getVarKindAt(pos); };
+  VarKind getVarKindAt(unsigned pos) const;
 
   /// The struct CountsSnapshot stores the count of each VarKind, and also of
   /// each constraint type. getCounts() returns a CountsSnapshot object
@@ -725,9 +722,13 @@ protected:
 /// where c_0, c_1, ..., c_n are integers and n is the total number of
 /// variables in the space.
 ///
+///
 /// An IntegerPolyhedron is similar to an IntegerRelation but it does not make a
 /// distinction between Domain and Range variables. Internally,
 /// IntegerPolyhedron is implemented as a IntegerRelation with zero domain vars.
+///
+/// Variables are stored in the following order:
+///       [SetDim, Symbols, Locals]
 ///
 /// Since IntegerPolyhedron does not make a distinction between kinds of
 /// dimensions, VarKind::SetDim should be used to refer to dimension
