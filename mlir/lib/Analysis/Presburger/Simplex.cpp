@@ -465,7 +465,13 @@ void SymbolicLexSimplex::recordOutput(SymbolicLexMin &result) const {
     }
     output.appendExtraRow(sample);
   }
-  result.lexmin.addPiece(domainPoly, output);
+
+  DivisionRepr divs = domainPoly.getLocalReprs();
+  PresburgerSpace funcSpace = result.lexmin.getSpace();
+  funcSpace.insertVar(VarKind::Local, 0, divs.getNumDivs());
+
+  MultiAffineFunction outFunc(funcSpace, output, divs);
+  result.lexmin.addPiece({PresburgerSet(domainPoly), outFunc});
 }
 
 Optional<unsigned> SymbolicLexSimplex::maybeGetAlwaysViolatedRow() {
@@ -507,7 +513,10 @@ LogicalResult SymbolicLexSimplex::doNonBranchingPivots() {
 }
 
 SymbolicLexMin SymbolicLexSimplex::computeSymbolicIntegerLexMin() {
-  SymbolicLexMin result(domainPoly.getSpace(), var.size() - nSymbol);
+  SymbolicLexMin result(PresburgerSpace::getRelationSpace(
+      /*numDomain=*/domainPoly.getNumDimVars(),
+      /*numRange=*/var.size() - nSymbol,
+      /*numSymbols=*/domainPoly.getNumSymbolVars()));
 
   /// The algorithm is more naturally expressed recursively, but we implement
   /// it iteratively here to avoid potential issues with stack overflows in the

@@ -73,14 +73,21 @@ inline PWMAFunction parsePWMAF(
     unsigned numSymbols = 0) {
   static MLIRContext context;
 
-  PWMAFunction result(PresburgerSpace::getSetSpace(
-                          /*numDims=*/numInputs - numSymbols, numSymbols),
-                      numOutputs);
+  PWMAFunction result(
+      PresburgerSpace::getRelationSpace(numInputs, numOutputs, numSymbols));
   for (const auto &pair : data) {
     IntegerPolyhedron domain = parsePoly(pair.first);
 
-    result.addPiece(
-        domain, makeMatrix(numOutputs, domain.getNumVars() + 1, pair.second));
+    Matrix outMat =
+        makeMatrix(numOutputs, domain.getNumVars() + 1, pair.second);
+
+    DivisionRepr divs = domain.getLocalReprs();
+
+    PresburgerSpace funcSpace = result.getSpace();
+    funcSpace.insertVar(VarKind::Local, 0, divs.getNumDivs());
+
+    MultiAffineFunction func(funcSpace, outMat, divs);
+    result.addPiece({PresburgerSet(domain), func});
   }
   return result;
 }

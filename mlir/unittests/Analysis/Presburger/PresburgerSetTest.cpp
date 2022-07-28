@@ -527,6 +527,7 @@ TEST(SetTest, divisionNonDivLocals) {
   IntegerPolyhedron triangle = parsePoly("(x,y) : (y >= 0, "
                                          "3000 * x - 2999 * y - 1000 >= 0, "
                                          "-3000 * x + 2998 * y + 2000 >= 0)");
+
   EXPECT_TRUE(triangle.containsPoint({1000, 1000}));
   EXPECT_FALSE(triangle.containsPoint({1001, 1001}));
   expectEqual(triangle, tetrahedron);

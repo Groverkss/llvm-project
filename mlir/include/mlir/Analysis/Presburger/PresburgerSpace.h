@@ -87,6 +87,9 @@ public:
                            numLocals);
   }
 
+  PresburgerSpace getDomainSpace() const;
+  PresburgerSpace getRangeSpace() const;
+
   unsigned getNumDomainVars() const { return numDomain; }
   unsigned getNumRangeVars() const { return numRange; }
   unsigned getNumSetDimVars() const { return numRange; }
