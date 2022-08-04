@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Parser.h"
+#include "PrettyPrinter.h"
 
 #include "mlir/Analysis/Presburger/PWMAFunction.h"
 #include "mlir/Analysis/Presburger/PresburgerRelation.h"
@@ -394,4 +395,24 @@ TEST(PWMAFunction, unionLexMinComplex) {
 
   EXPECT_TRUE(func1.unionLexMin(func2).isEqual(result));
   EXPECT_TRUE(func2.unionLexMin(func1).isEqual(result));
+}
+
+TEST(PWMAFunction, unionLexMinWithLocals) {
+  PWMAFunction func1 = parsePWMAF({
+      {"(x, y) : (x mod 5 == 0)", "(x, y) -> (x, 1)"},
+  });
+
+  PWMAFunction func2 = parsePWMAF({
+      {"(x, y) : (x mod 7 == 0)", "(x, y) -> (x + y, 2)"},
+  });
+
+  prettyDump(func1.unionLexMin(func2));
+
+  /* PWMAFunction result = parsePWMAF({ */
+  /*     {"() : ()", "() -> ()"}, */
+  /*     {"() : ()", "() -> ()"}, */
+  /* }); */
+
+  /* EXPECT_TRUE(func1.unionLexMin(func2).isEqual(result)); */
+  /* EXPECT_TRUE(func2.unionLexMin(func1).isEqual(result)); */
 }

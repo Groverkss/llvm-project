@@ -22,6 +22,8 @@
 namespace mlir {
 namespace presburger {
 
+enum class Compare { LT, GT, GE, LE, EQ };
+
 /// This class represents a multi-affine function whose domain is given by an
 /// IntegerPolyhedron. This can be thought of as an IntegerPolyhedron with a
 /// tuple of integer values attached to every point in the polyhedron, with the
@@ -94,6 +96,8 @@ public:
                const PresburgerSet &restrict) const;
 
   void subtract(const MultiAffineFunction &other);
+
+  PresburgerSet getLexSet(Compare comp, const MultiAffineFunction &other) const;
 
   IntegerRelation getAsRelation() const;
 

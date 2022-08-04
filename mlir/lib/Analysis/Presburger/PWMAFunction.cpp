@@ -172,6 +172,91 @@ void MultiAffineFunction::mergeLocalVars(MultiAffineFunction &other) {
   other.assertIsConsistent();
 }
 
+PresburgerSet
+MultiAffineFunction::getLexSet(Compare comp,
+                               const MultiAffineFunction &other) const {
+  assert(getSpace().isCompatible(other.getSpace()) &&
+         "Output space of funcs should be compatible");
+
+  // Create copies of functions and merge their local space.
+  MultiAffineFunction funcA = *this;
+  MultiAffineFunction funcB = other;
+  funcA.mergeLocalVars(funcB);
+
+  // We first create the set `result`, corresponding to the set where output
+  // of funcA is lexicographically larger/smaller than funcB. This is done by
+  // creating a PresburgerSet with the following constraints:
+  //
+  //    (outA[0] > outB[0]) U
+  //    (outA[0] = outB[0], outA[1] > outA[1]) U
+  //    (outA[0] = outB[0], outA[1] = outA[1], outA[2] > outA[2]) U
+  //    ...
+  //    (outA[0] = outB[0], ..., outA[n-2] = outB[n-2], outA[n-1] > outB[n-1])
+  //
+  // where `n` is the number of outputs.
+  // If `lexMin` is set, the complement inequality is used:
+  //
+  //    (outA[0] < outB[0]) U
+  //    (outA[0] = outB[0], outA[1] < outA[1]) U
+  //    (outA[0] = outB[0], outA[1] = outA[1], outA[2] < outA[2]) U
+  //    ...
+  //    (outA[0] = outB[0], ..., outA[n-2] = outB[n-2], outA[n-1] < outB[n-1])
+  PresburgerSpace resultSpace = funcA.getDomainSpace();
+  PresburgerSet result =
+      PresburgerSet::getEmpty(resultSpace.getSpaceWithoutLocals());
+  IntegerPolyhedron levelSet(
+      /*numReservedInequalities=*/1 + 2 * resultSpace.getNumLocalVars(),
+      /*numReservedEqualities=*/funcA.getNumOutputs(),
+      /*numReservedCols=*/resultSpace.getNumVars() + 1, resultSpace);
+
+  // Add division inequalities to `levelSet`.
+  for (unsigned i = 0, e = funcA.getNumDivs(); i < e; ++i) {
+    levelSet.addInequality(getDivUpperBound(funcA.divs.getDividend(i),
+                                            funcA.divs.getDenom(i),
+                                            funcA.divs.getDivOffset() + i));
+    levelSet.addInequality(getDivLowerBound(funcA.divs.getDividend(i),
+                                            funcA.divs.getDenom(i),
+                                            funcA.divs.getDivOffset() + i));
+  }
+
+  for (unsigned level = 0; level < funcA.getNumOutputs(); ++level) {
+    // Create the expression `outA - outB` for this level.
+    SmallVector<int64_t, 8> subExpr =
+        subtractExprs(funcA.getOutputExpr(level), funcB.getOutputExpr(level));
+
+    switch (comp) {
+    case Compare::LT:
+      // For less than, we add an upper bound of -1:
+      //        outA - outB <= -1
+      //        outA <= outB - 1
+      //        outA < outB
+      levelSet.addBound(IntegerPolyhedron::BoundType::UB, subExpr, -1);
+      break;
+    case Compare::GT:
+      // For greater than, we add a lower bound of 1:
+      //        outA - outB >= 1
+      //        outA > outB + 1
+      //        outA > outB
+      levelSet.addBound(IntegerPolyhedron::BoundType::LB, subExpr, 1);
+      break;
+    case Compare::GE:
+    case Compare::LE:
+    case Compare::EQ:
+      assert(false && "Unimplemented case");
+    }
+
+    // Union the set with the result.
+    result.unionInPlace(levelSet);
+    // The last inequality in `levelSet` is the bound we inserted. We remove
+    // that for next iteration.
+    levelSet.removeInequality(levelSet.getNumInequalities() - 1);
+    // Add equality `outA - outB == 0` for this level for next iteration.
+    levelSet.addEquality(subExpr);
+  }
+
+  return result;
+}
+
 /// Two PWMAFunctions are equal if they have the same dimensionalities,
 /// the same domain, and take the same value at every point in the domain.
 bool PWMAFunction::isEqual(const PWMAFunction &other) const {
@@ -272,82 +357,20 @@ PWMAFunction PWMAFunction::unionFunction(
 /// lexicographically. If `lexMin` is true, then the ties are broken by
 /// taking the lexicographically smaller output and otherwise, by taking the
 /// lexicographically larger output.
-template <bool lexMin>
+template <Compare comp>
 static PresburgerSet tiebreakLex(const PWMAFunction::Piece &pieceA,
                                  const PWMAFunction::Piece &pieceB) {
-  // TODO: Support local variables here.
-  assert(pieceA.domain.getSpace().isCompatible(pieceB.domain.getSpace()) &&
-         "Number of outputs of both functions should be same.");
-  assert(pieceA.domain.getSpace().getNumLocalVars() == 0 &&
-         "Local variables are not supported yet.");
-
-  PresburgerSpace compatibleSpace = pieceA.domain.getSpace();
-  const PresburgerSpace &space = pieceA.domain.getSpace();
-
-  // We first create the set `result`, corresponding to the set where output
-  // of pieceA is lexicographically larger/smaller than pieceB. This is done by
-  // creating a PresburgerSet with the following constraints:
-  //
-  //    (outA[0] > outB[0]) U
-  //    (outA[0] = outB[0], outA[1] > outA[1]) U
-  //    (outA[0] = outB[0], outA[1] = outA[1], outA[2] > outA[2]) U
-  //    ...
-  //    (outA[0] = outB[0], ..., outA[n-2] = outB[n-2], outA[n-1] > outB[n-1])
-  //
-  // where `n` is the number of outputs.
-  // If `lexMin` is set, the complement inequality is used:
-  //
-  //    (outA[0] < outB[0]) U
-  //    (outA[0] = outB[0], outA[1] < outA[1]) U
-  //    (outA[0] = outB[0], outA[1] = outA[1], outA[2] < outA[2]) U
-  //    ...
-  //    (outA[0] = outB[0], ..., outA[n-2] = outB[n-2], outA[n-1] < outB[n-1])
-  PresburgerSet result = PresburgerSet::getEmpty(compatibleSpace);
-  IntegerPolyhedron levelSet(
-      /*numReservedInequalities=*/1,
-      /*numReservedEqualities=*/pieceA.output.getNumOutputs(),
-      /*numReservedCols=*/space.getNumVars() + 1, space);
-  for (unsigned level = 0; level < pieceA.output.getNumOutputs(); ++level) {
-
-    // Create the expression `outA - outB` for this level.
-    SmallVector<int64_t, 8> subExpr = subtractExprs(
-        pieceA.output.getOutputExpr(level), pieceB.output.getOutputExpr(level));
-
-    if (lexMin) {
-      // For lexMin, we add an upper bound of -1:
-      //        outA - outB <= -1
-      //        outA <= outB - 1
-      //        outA < outB
-      levelSet.addBound(IntegerPolyhedron::BoundType::UB, subExpr, -1);
-    } else {
-      // For lexMax, we add a lower bound of 1:
-      //        outA - outB >= 1
-      //        outA > outB + 1
-      //        outA > outB
-      levelSet.addBound(IntegerPolyhedron::BoundType::LB, subExpr, 1);
-    }
-
-    // Union the set with the result.
-    result.unionInPlace(levelSet);
-    // There is only 1 inequality in `levelSet`, so the index is always 0.
-    levelSet.removeInequality(0);
-    // Add equality `outA - outB == 0` for this level for next iteration.
-    levelSet.addEquality(subExpr);
-  }
-
-  // We then intersect `result` with the domain of pieceA and pieceB, to only
-  // tiebreak on the domain where both are defined.
+  PresburgerSet result = pieceA.output.getLexSet(comp, pieceB.output);
   result = result.intersect(pieceA.domain).intersect(pieceB.domain);
-
   return result;
 }
 
 PWMAFunction PWMAFunction::unionLexMin(const PWMAFunction &func) {
-  return unionFunction(func, tiebreakLex</*lexMin=*/true>);
+  return unionFunction(func, tiebreakLex</*comp=*/Compare::LT>);
 }
 
 PWMAFunction PWMAFunction::unionLexMax(const PWMAFunction &func) {
-  return unionFunction(func, tiebreakLex</*lexMin=*/false>);
+  return unionFunction(func, tiebreakLex</*comp=*/Compare::GT>);
 }
 
 void MultiAffineFunction::subtract(const MultiAffineFunction &other) {
