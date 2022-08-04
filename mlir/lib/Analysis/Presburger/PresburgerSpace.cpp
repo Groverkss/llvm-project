@@ -22,6 +22,10 @@ PresburgerSpace PresburgerSpace::getRangeSpace() const {
   return PresburgerSpace::getSetSpace(numRange, numSymbols, numLocals);
 }
 
+PresburgerSpace PresburgerSpace::getSpaceWithoutLocals() const {
+  return PresburgerSpace::getRelationSpace(numDomain, numRange, numSymbols);
+}
+
 unsigned PresburgerSpace::getNumVarKind(VarKind kind) const {
   switch (kind) {
   case VarKind::Domain:

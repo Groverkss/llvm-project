@@ -72,6 +72,8 @@ public:
   /// Get the `i^th` output expression.
   ArrayRef<int64_t> getOutputExpr(unsigned i) const { return output.getRow(i); }
 
+  const DivisionRepr &getDivs() const { return divs; }
+
   void removeOutputs(unsigned start, unsigned end);
 
   /// Given a MAF `other`, merges local variables such that both funcitons
@@ -158,6 +160,8 @@ public:
   /// Return the domain of this piece-wise MultiAffineFunction. This is the
   /// union of the domains of all the pieces.
   PresburgerSet getDomain() const;
+
+  ArrayRef<Piece> getAllPieces() const { return pieces; }
 
   Optional<SmallVector<int64_t, 8>> valueAt(ArrayRef<int64_t> point) const;
 

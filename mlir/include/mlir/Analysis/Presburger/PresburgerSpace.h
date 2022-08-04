@@ -89,6 +89,7 @@ public:
 
   PresburgerSpace getDomainSpace() const;
   PresburgerSpace getRangeSpace() const;
+  PresburgerSpace getSpaceWithoutLocals() const;
 
   unsigned getNumDomainVars() const { return numDomain; }
   unsigned getNumRangeVars() const { return numRange; }
