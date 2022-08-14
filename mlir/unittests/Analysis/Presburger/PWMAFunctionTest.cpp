@@ -398,21 +398,43 @@ TEST(PWMAFunction, unionLexMinComplex) {
 }
 
 TEST(PWMAFunction, unionLexMinWithLocals) {
-  PWMAFunction func1 = parsePWMAF({
-      {"(x, y) : (x mod 5 == 0)", "(x, y) -> (x, 1)"},
-  });
+  {
+    PWMAFunction func1 = parsePWMAF({
+        {"(x, y) : (x mod 5 == 0)", "(x, y) -> (x, 1)"},
+    });
 
-  PWMAFunction func2 = parsePWMAF({
-      {"(x, y) : (x mod 7 == 0)", "(x, y) -> (x + y, 2)"},
-  });
+    PWMAFunction func2 = parsePWMAF({
+        {"(x, y) : (x mod 7 == 0)", "(x, y) -> (x + y, 2)"},
+    });
 
-  prettyDump(func1.unionLexMin(func2));
+    PWMAFunction result = parsePWMAF({
+        {"(x, y) : (x mod 5 == 0, x mod 7 >= 1)", "(x, y) -> (x, 1)"},
+        {"(x, y) : (x mod 5 >= 1, x mod 7 == 0)", "(x, y) -> (x + y, 2)"},
+        {"(x, y) : (x mod 5 == 0, x mod 7 == 0, y >= 0)", "(x, y) -> (x, 1)"},
+        {"(x, y) : (x mod 5 == 0, x mod 7 == 0, y <= -1)",
+         "(x, y) -> (x + y, 2)"},
+    });
 
-  /* PWMAFunction result = parsePWMAF({ */
-  /*     {"() : ()", "() -> ()"}, */
-  /*     {"() : ()", "() -> ()"}, */
-  /* }); */
+    EXPECT_TRUE(func1.unionLexMin(func2).isEqual(result));
+    EXPECT_TRUE(func2.unionLexMin(func1).isEqual(result));
+  }
 
-  /* EXPECT_TRUE(func1.unionLexMin(func2).isEqual(result)); */
-  /* EXPECT_TRUE(func2.unionLexMin(func1).isEqual(result)); */
+  {
+    PWMAFunction func1 = parsePWMAF({
+        {"(x, y) : ()", "(x, y) -> (x mod 2, y mod 3)"},
+    });
+
+    PWMAFunction func2 = parsePWMAF({
+        {"(x, y) : ()", "(x, y) -> (x mod 3, y mod 2)"},
+    });
+
+    prettyDump(func1.unionLexMin(func2));
+
+    /* PWMAFunction result = parsePWMAF({ */
+    /*     {"(x, y) : (x mod 5 == 0, x mod 7 >= 1)", "(x, y) -> (x, 1)"}, */
+    /* }); */
+
+    /* EXPECT_TRUE(func1.unionLexMin(func2).isEqual(result)); */
+    /* EXPECT_TRUE(func2.unionLexMin(func1).isEqual(result)); */
+  }
 }

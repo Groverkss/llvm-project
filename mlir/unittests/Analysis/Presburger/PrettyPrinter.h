@@ -26,10 +26,10 @@ namespace mlir {
 namespace presburger {
 
 template <typename T>
-inline void prettyPrint(const T &obj, raw_ostream &os, bool simplify = true);
+inline void prettyPrint(const T &obj, raw_ostream &os, bool simplify = false);
 
 template <typename T>
-inline void prettyDump(const T &obj, bool simplify = true) {
+inline void prettyDump(const T &obj, bool simplify = false) {
   prettyPrint(obj, llvm::errs(), simplify);
   llvm::errs() << "\n";
 }
@@ -139,7 +139,7 @@ inline void printSpace(const PresburgerSpace &space, raw_ostream &os) {
 inline void printConstraints(ArrayRef<AffineExpr> ineqs,
                              ArrayRef<AffineExpr> eqs,
                              const PresburgerSpace &space, unsigned numExists,
-                             raw_ostream &os, bool simplify = true) {
+                             raw_ostream &os, bool simplify = false) {
   if (numExists != 0) {
     os << "(exists ";
     unsigned offset = space.getNumDimVars();
@@ -178,9 +178,11 @@ inline void printConstraints(ArrayRef<AffineExpr> ineqs,
 
 inline void printIntegerRelationWithoutSpace(const IntegerRelation &obj,
                                              raw_ostream &os,
-                                             bool simplify = true) {
+                                             bool simplify = false) {
   MLIRContext context(MLIRContext::Threading::DISABLED);
   IntegerRelation poly = obj;
+  if (simplify)
+    poly.removeRedundantConstraints();
 
   std::vector<MaybeLocalRepr> reprs(poly.getNumLocalVars());
   DivisionRepr divs = poly.getLocalReprs(&reprs);
@@ -193,10 +195,24 @@ inline void printIntegerRelationWithoutSpace(const IntegerRelation &obj,
   // TODO: Only strong upper bounds can be removed. This is not true always
   // here.
   llvm::SmallBitVector redundantIneqs(poly.getNumInequalities());
-  for (const MaybeLocalRepr &repr : reprs) {
+  for (unsigned i = 0, e = divs.getNumDivs(); i < e; ++i) {
+    const MaybeLocalRepr &repr = reprs[i];
     if (repr.kind == ReprKind::Inequality) {
-      redundantIneqs[repr.repr.inequalityPair.lowerBoundIdx] = true;
-      redundantIneqs[repr.repr.inequalityPair.upperBoundIdx] = true;
+      unsigned lb = repr.repr.inequalityPair.lowerBoundIdx;
+      unsigned ub = repr.repr.inequalityPair.upperBoundIdx;
+
+      SmallVector<int64_t, 8> expectedLb = getDivLowerBound(
+          divs.getDividend(i), divs.getDenom(i), i + divs.getDivOffset());
+      SmallVector<int64_t, 8> expectedUb = getDivUpperBound(
+          divs.getDividend(i), divs.getDenom(i), i + divs.getDivOffset());
+
+      if (std::equal(expectedLb.begin(), expectedLb.end(),
+                     poly.getInequality(ub).begin()))
+        redundantIneqs[ub] = true;
+
+      if (std::equal(expectedUb.begin(), expectedUb.end(),
+                     poly.getInequality(lb).begin()))
+        redundantIneqs[lb] = true;
     }
   }
 
@@ -211,7 +227,7 @@ inline void printIntegerRelationWithoutSpace(const IntegerRelation &obj,
 
 inline void printPresburgerRealtionWithoutSpace(const PresburgerRelation &obj,
                                                 raw_ostream &os,
-                                                bool simplify = true) {
+                                                bool simplify = false) {
   if (obj.getNumDisjuncts() == 0)
     os << "false";
 
