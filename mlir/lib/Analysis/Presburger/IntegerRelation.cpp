@@ -374,6 +374,12 @@ void IntegerRelation::swapVar(unsigned posA, unsigned posB) {
   if (posA == posB)
     return;
 
+  VarKind kindA = space.getVarKindAt(posA);
+  VarKind kindB = space.getVarKindAt(posB);
+  unsigned relativePosA = posA - getVarKindOffset(kindA);
+  unsigned relativePosB = posB - getVarKindOffset(kindB);
+  space.swapVar(kindA, kindB, relativePosA, relativePosB);
+
   inequalities.swapColumns(posA, posB);
   equalities.swapColumns(posA, posB);
 }
@@ -2218,13 +2224,10 @@ void IntegerRelation::compose(const IntegerRelation &rel) {
 
   // Convert R1 from A -> B to A -> (B X C).
   appendVar(VarKind::Range, copyRel.getNumRangeVars());
-
   // Convert R2 to B X C.
   copyRel.convertVarKind(VarKind::Domain, 0, numBVars, VarKind::Range, 0);
-
   // Intersect R2 to range of R1.
   intersectRange(IntegerPolyhedron(copyRel));
-
   // Project out B in R1.
   convertVarKind(VarKind::Range, 0, numBVars, VarKind::Local);
 }

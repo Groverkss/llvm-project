@@ -803,13 +803,12 @@ FlatLinearValueConstraints::FlatLinearValueConstraints(IntegerSet set,
                             set.getNumDims() + set.getNumSymbols() + 1,
                             set.getNumDims(), set.getNumSymbols(),
                             /*numLocals=*/0) {
-  // Populate values.
-  if (operands.empty()) {
-    values.resize(getNumDimAndSymbolVars(), std::nullopt);
-  } else {
-    assert(set.getNumInputs() == operands.size() && "operand count mismatch");
-    values.assign(operands.begin(), operands.end());
-  }
+
+  // Use values in space for FlatLinearValueConstraints.
+  space.resetIds();
+  // Set the values for the non-local variables.
+  for (unsigned i = 0, e = operands.size(); i < e; ++i)
+    setValue(i, operands[i]);
 
   // Flatten expressions and add them to the constraint system.
   std::vector<SmallVector<int64_t, 8>> flatExprs;
@@ -900,12 +899,6 @@ unsigned FlatLinearValueConstraints::insertSymbolVar(unsigned pos,
 unsigned FlatLinearValueConstraints::insertVar(VarKind kind, unsigned pos,
                                                unsigned num) {
   unsigned absolutePos = IntegerPolyhedron::insertVar(kind, pos, num);
-
-  if (kind != VarKind::Local) {
-    values.insert(values.begin() + absolutePos, num, std::nullopt);
-    assert(values.size() == getNumDimAndSymbolVars());
-  }
-
   return absolutePos;
 }
 
@@ -918,27 +911,23 @@ unsigned FlatLinearValueConstraints::insertVar(VarKind kind, unsigned pos,
   unsigned absolutePos = IntegerPolyhedron::insertVar(kind, pos, num);
 
   // If a Value is provided, insert it; otherwise use None.
-  for (unsigned i = 0; i < num; ++i)
-    values.insert(values.begin() + absolutePos + i,
-                  vals[i] ? std::optional<Value>(vals[i]) : std::nullopt);
+  for (unsigned i = 0, e = vals.size(); i < e; ++i)
+    setValue(absolutePos + i, vals[i]);
 
-  assert(values.size() == getNumDimAndSymbolVars());
   return absolutePos;
 }
 
 bool FlatLinearValueConstraints::hasValues() const {
-  return llvm::any_of(
-      values, [](const std::optional<Value> &var) { return var.has_value(); });
+  return llvm::any_of(getMaybeValues(), [](const std::optional<Value> &var) {
+    return var.has_value();
+  });
 }
 
 /// Checks if two constraint systems are in the same space, i.e., if they are
 /// associated with the same set of variables, appearing in the same order.
 static bool areVarsAligned(const FlatLinearValueConstraints &a,
                            const FlatLinearValueConstraints &b) {
-  return a.getNumDimVars() == b.getNumDimVars() &&
-         a.getNumSymbolVars() == b.getNumSymbolVars() &&
-         a.getNumVars() == b.getNumVars() &&
-         a.getMaybeValues().equals(b.getMaybeValues());
+  return a.getSpace().isAligned(b.getSpace());
 }
 
 /// Calls areVarsAligned to check if two constraint systems have the same set
@@ -961,12 +950,14 @@ static bool LLVM_ATTRIBUTE_UNUSED areVarsUnique(
     return true;
 
   SmallPtrSet<Value, 8> uniqueVars;
-  ArrayRef<std::optional<Value>> maybeValues =
-      cst.getMaybeValues().slice(start, end - start);
-  for (std::optional<Value> val : maybeValues) {
+  SmallVector<std::optional<Value>, 8> maybeValuesAll = cst.getMaybeValues();
+  ArrayRef<std::optional<Value>> maybeValues = {maybeValuesAll.data() + start,
+                                                maybeValuesAll.data() + end};
+
+  for (std::optional<Value> val : maybeValues)
     if (val && !uniqueVars.insert(*val).second)
       return false;
-  }
+
   return true;
 }
 
@@ -980,7 +971,6 @@ areVarsUnique(const FlatLinearValueConstraints &cst) {
 /// are unique.
 static bool LLVM_ATTRIBUTE_UNUSED
 areVarsUnique(const FlatLinearValueConstraints &cst, VarKind kind) {
-
   if (kind == VarKind::SetDim)
     return areVarsUnique(cst, 0, cst.getNumDimVars());
   if (kind == VarKind::Symbol)
@@ -1092,20 +1082,9 @@ void FlatLinearValueConstraints::mergeSymbolVars(
   assert(areVarsUnique(other, VarKind::Symbol) && "Symbol vars are not unique");
 }
 
-bool FlatLinearValueConstraints::hasConsistentState() const {
-  return IntegerPolyhedron::hasConsistentState() &&
-         values.size() == getNumDimAndSymbolVars();
-}
-
 void FlatLinearValueConstraints::removeVarRange(VarKind kind, unsigned varStart,
                                                 unsigned varLimit) {
   IntegerPolyhedron::removeVarRange(kind, varStart, varLimit);
-  unsigned offset = getVarKindOffset(kind);
-
-  if (kind != VarKind::Local) {
-    values.erase(values.begin() + varStart + offset,
-                 values.begin() + varLimit + offset);
-  }
 }
 
 AffineMap
@@ -1123,14 +1102,14 @@ FlatLinearValueConstraints::computeAlignedMap(AffineMap map,
 
   dims.reserve(getNumDimVars());
   syms.reserve(getNumSymbolVars());
-  for (unsigned i = getVarKindOffset(VarKind::SetDim),
-                e = getVarKindEnd(VarKind::SetDim);
-       i < e; ++i)
-    dims.push_back(values[i] ? *values[i] : Value());
-  for (unsigned i = getVarKindOffset(VarKind::Symbol),
-                e = getVarKindEnd(VarKind::Symbol);
-       i < e; ++i)
-    syms.push_back(values[i] ? *values[i] : Value());
+  for (unsigned i = 0, e = getNumVarKind(VarKind::SetDim); i < e; ++i) {
+    Identifier id = space.getId(VarKind::SetDim, i);
+    dims.push_back(id.hasValue() ? Value(id.getValue<Value>()) : Value());
+  }
+  for (unsigned i = 0, e = getNumVarKind(VarKind::Symbol); i < e; ++i) {
+    Identifier id = space.getId(VarKind::Symbol, i);
+    syms.push_back(id.hasValue() ? Value(id.getValue<Value>()) : Value());
+  }
 
   AffineMap alignedMap =
       alignAffineMapWithValues(map, operands, dims, syms, newSymsPtr);
@@ -1143,7 +1122,7 @@ FlatLinearValueConstraints::computeAlignedMap(AffineMap map,
 
 bool FlatLinearValueConstraints::findVar(Value val, unsigned *pos) const {
   unsigned i = 0;
-  for (const auto &mayBeVar : values) {
+  for (const auto &mayBeVar : getMaybeValues()) {
     if (mayBeVar && *mayBeVar == val) {
       *pos = i;
       return true;
@@ -1154,25 +1133,12 @@ bool FlatLinearValueConstraints::findVar(Value val, unsigned *pos) const {
 }
 
 bool FlatLinearValueConstraints::containsVar(Value val) const {
-  return llvm::any_of(values, [&](const std::optional<Value> &mayBeVar) {
-    return mayBeVar && *mayBeVar == val;
-  });
+  unsigned pos;
+  return findVar(val, &pos);
 }
 
 void FlatLinearValueConstraints::swapVar(unsigned posA, unsigned posB) {
   IntegerPolyhedron::swapVar(posA, posB);
-
-  if (getVarKindAt(posA) == VarKind::Local &&
-      getVarKindAt(posB) == VarKind::Local)
-    return;
-
-  // Treat value of a local variable as std::nullopt.
-  if (getVarKindAt(posA) == VarKind::Local)
-    values[posB] = std::nullopt;
-  else if (getVarKindAt(posB) == VarKind::Local)
-    values[posA] = std::nullopt;
-  else
-    std::swap(values[posA], values[posB]);
 }
 
 void FlatLinearValueConstraints::addBound(BoundType type, Value val,
@@ -1214,27 +1180,13 @@ void FlatLinearValueConstraints::printSpace(raw_ostream &os) const {
 
 void FlatLinearValueConstraints::clearAndCopyFrom(
     const IntegerRelation &other) {
-
-  if (auto *otherValueSet =
-          dyn_cast<const FlatLinearValueConstraints>(&other)) {
-    *this = *otherValueSet;
-  } else {
-    *static_cast<IntegerRelation *>(this) = other;
-    values.clear();
-    values.resize(getNumDimAndSymbolVars(), std::nullopt);
-  }
+  IntegerPolyhedron::clearAndCopyFrom(other);
 }
 
 void FlatLinearValueConstraints::fourierMotzkinEliminate(
     unsigned pos, bool darkShadow, bool *isResultIntegerExact) {
-  SmallVector<std::optional<Value>, 8> newVals = values;
-  if (getVarKindAt(pos) != VarKind::Local)
-    newVals.erase(newVals.begin() + pos);
-  // Note: Base implementation discards all associated Values.
   IntegerPolyhedron::fourierMotzkinEliminate(pos, darkShadow,
                                              isResultIntegerExact);
-  values = newVals;
-  assert(values.size() == getNumDimAndSymbolVars());
 }
 
 void FlatLinearValueConstraints::projectOut(Value val) {
@@ -1247,11 +1199,8 @@ void FlatLinearValueConstraints::projectOut(Value val) {
 
 LogicalResult FlatLinearValueConstraints::unionBoundingBox(
     const FlatLinearValueConstraints &otherCst) {
-  assert(otherCst.getNumDimVars() == getNumDimVars() && "dims mismatch");
-  assert(otherCst.getMaybeValues()
-             .slice(0, getNumDimVars())
-             .equals(getMaybeValues().slice(0, getNumDimVars())) &&
-         "dim values mismatch");
+  assert(otherCst.getSpace().isAligned(getSpace(), VarKind::SetDim) &&
+         "dims mismatch");
   assert(otherCst.getNumLocalVars() == 0 && "local vars not supported here");
   assert(getNumLocalVars() == 0 && "local vars not supported yet here");
 
