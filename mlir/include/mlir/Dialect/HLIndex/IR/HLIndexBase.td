@@ -32,7 +32,7 @@ def HLIndex_Dialect : Dialect {
   }];
 
   let hasConstantMaterializer = 1;
-  // let useDefaultAttributePrinterParser = 1;
+  let useDefaultAttributePrinterParser = 1;
 }
 
 #endif // INDEX_DIALECT

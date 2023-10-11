@@ -13,6 +13,7 @@
 #ifndef HLINDEX_OPS
 #define HLINDEX_OPS
 
+include "mlir/Dialect/HLIndex/IR/HLIndexAttributes.td"
 include "mlir/Dialect/HLIndex/IR/HLIndexBase.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/OpBase.td"
@@ -25,8 +26,8 @@ class HLIndex_Op<string mnemonic, list<Trait> traits = []> :
 def HLIndexApplyOp : HLIndex_Op<"apply", [Pure]> {
   let summary = "index map apply operation";
   let description = [{
-    The `hlindex.apply` operation applies an index map to a list of SSA values,
-    yielding a single SSA value. The number of arguements to `hlindex.apply`
+    The `hl_index.apply` operation applies an index map to a list of SSA values,
+    yielding a single SSA value. The number of arguements to `hl_index.apply`
     must be equal to the number of inputs to the index mapping; The input
     operands and result must all have ‘index’ type.
 
@@ -35,33 +36,31 @@ def HLIndexApplyOp : HLIndex_Op<"apply", [Pure]> {
     ```mlir
     #map10 = index_map<(v0, v1) -> (v0 floordiv 8 + v1 floordiv 128)>
     ...
-    %1 = hlindex.apply #map10 (%s, %t)
+    %1 = hl_index.apply #map10 (%s, %t)
 
     // Inline example.
-    %2 = hlindex.apply index_map<(v0) -> (-v0)> (%42)
+    %2 = hl_index.apply index_map<(d0) -> (-d0)> (%42)
     ```
   }];
-  let arguments = (ins AffineMapAttr:$map, Variadic<Index>:$mapOperands);
+  let arguments = (ins IndexMapAttr:$map, Variadic<Index>:$mapOperands);
   let results = (outs Index);
 
-  // TODO: The auto-generated builders should check to see if the return type
-  // has a constant builder. That way we wouldn't need to explicitly specify the
-  // result types here.
   let builders = [
     OpBuilder<(ins "AffineMap":$map, "ValueRange":$mapOperands),
     [{
-      build($_builder, $_state, $_builder.getIndexType(), map, mapOperands);
+      build($_builder, $_state, $_builder.getIndexType(), IndexMapAttr::get(map), mapOperands);
     }]>,
     OpBuilder<(ins "ArrayRef<AffineExpr> ":$exprList,"ValueRange":$mapOperands),
     [{
       build($_builder, $_state, $_builder.getIndexType(),
-            AffineMap::inferFromExprList(exprList).front(), mapOperands);
+            IndexMapAttr::get(AffineMap::inferFromExprList(exprList).front()),
+            mapOperands);
     }]>
   ];
 
   let extraClassDeclaration = [{
     /// Returns the affine map to be applied by this operation.
-    AffineMap getAffineMap() { return getMap(); }
+    AffineMap getIndexMap() { return getMap().getAffineMap(); }
   }];
 
   // let hasCanonicalizer = 1;

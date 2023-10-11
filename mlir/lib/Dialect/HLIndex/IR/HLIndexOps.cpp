@@ -1,4 +1,4 @@
-//===- AffineOps.cpp - MLIR Affine Operations -----------------------------===//
+//===- HLIndexOps.cpp - HLIndex Operations --------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -7,41 +7,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "mlir/Dialect/HLIndex/IR/HLIndexOps.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/IR/AffineExprVisitor.h"
-#include "mlir/IR/IRMapping.h"
-#include "mlir/IR/IntegerSet.h"
-#include "mlir/IR/Matchers.h"
-#include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/Interfaces/ShapedOpInterfaces.h"
-#include "mlir/Support/MathExtras.h"
-#include "mlir/Transforms/InliningUtils.h"
-#include "llvm/ADT/ScopeExit.h"
-#include "llvm/ADT/SmallBitVector.h"
-#include "llvm/ADT/SmallVectorExtras.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
-#include <numeric>
-#include <optional>
 
 using namespace mlir;
 using namespace mlir::hl_index;
 
 #define DEBUG_TYPE "hlindex-ops"
-
-#include "mlir/Dialect/HLIndex/IR/HLIndexOpsDialect.cpp.inc"
-
-//===----------------------------------------------------------------------===//
-// HLIndexDialect
-//===----------------------------------------------------------------------===//
-
-void HLIndexDialect::initialize() {
-  addOperations<
-#define GET_OP_LIST
-#include "mlir/Dialect/HLIndex/IR/HLIndexOps.cpp.inc"
-      >();
-}
 
 //===----------------------------------------------------------------------===//
 // HLIndexApplyOp
@@ -68,7 +39,7 @@ ParseResult HLIndexApplyOp::parse(OpAsmParser &parser, OperationState &result) {
   auto &builder = parser.getBuilder();
   auto indexTy = builder.getIndexType();
 
-  AffineMapAttr mapAttr;
+  IndexMapAttr mapAttr;
   unsigned numDims;
   if (parser.parseAttribute(mapAttr, "map", result.attributes) ||
       parseDimAndSymbolList(parser, result.operands, numDims) ||
@@ -99,13 +70,13 @@ static void printDimAndSymbolList(Operation::operand_iterator begin,
 void HLIndexApplyOp::print(OpAsmPrinter &p) {
   p << " " << getMapAttr();
   printDimAndSymbolList(operand_begin(), operand_end(),
-                        getAffineMap().getNumDims(), p);
+                        getIndexMap().getNumDims(), p);
   p.printOptionalAttrDict((*this)->getAttrs(), /*elidedAttrs=*/{"map"});
 }
 
 LogicalResult HLIndexApplyOp::verify() {
   // Check input and output dimensions match.
-  AffineMap affineMap = getMap();
+  AffineMap affineMap = getIndexMap();
 
   // Verify that operand count matches affine map dimension and symbol count.
   if (getNumOperands() != affineMap.getNumDims() + affineMap.getNumSymbols())
@@ -128,7 +99,7 @@ Operation *HLIndexDialect::materializeConstant(OpBuilder &builder,
 }
 
 OpFoldResult HLIndexApplyOp::fold(FoldAdaptor adaptor) {
-  auto map = getAffineMap();
+  auto map = getIndexMap();
 
   // Fold dims and symbols to existing values.
   auto expr = map.getResult(0);
@@ -143,10 +114,3 @@ OpFoldResult HLIndexApplyOp::fold(FoldAdaptor adaptor) {
     return {};
   return result[0];
 }
-
-//===----------------------------------------------------------------------===//
-// TableGen'd op method definitions
-//===----------------------------------------------------------------------===//
-
-#define GET_OP_CLASSES
-#include "mlir/Dialect/HLIndex/IR/HLIndexOps.cpp.inc"

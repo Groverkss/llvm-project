@@ -18,7 +18,10 @@
 
 #include "mlir/Dialect/HLIndex/IR/HLIndexOpsDialect.h.inc"
 
+#define GET_ATTRDEF_CLASSES
+#include "mlir/Dialect/HLIndex/IR/HLIndexAttributes.h.inc"
+
 #define GET_OP_CLASSES
 #include "mlir/Dialect/HLIndex/IR/HLIndexOps.h.inc"
 
-#endif
+#endif // MLIR_DIALECT_HLINDEX_IR_HLINDEXOPS_H

@@ -1,10 +1,12 @@
 add_mlir_dialect_library(HLIndexDialect
+  HLIndexDialect.cpp
   HLIndexOps.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${MLIR_MAIN_INCLUDE_DIR}/mlir/Dialect/HLIndex
 
   DEPENDS
+  MLIRHLIndexAttributesIncGen
   MLIRHLIndexOpsIncGen
 
   LINK_LIBS PUBLIC
