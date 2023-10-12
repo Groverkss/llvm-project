@@ -54,6 +54,7 @@ def IndexMapAttr : HLIndex_Attr<"IndexMap", "index_map"> {
 
   let skipDefaultBuilders = 1;
   let hasCustomAssemblyFormat = 1;
+  let genVerifyDecl = 1;
 }
 
 #endif // HLINDEX_ATTRIBUTES

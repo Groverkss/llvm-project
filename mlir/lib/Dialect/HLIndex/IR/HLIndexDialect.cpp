@@ -54,6 +54,15 @@ void IndexMapAttr::print(AsmPrinter &odsPrinter) const {
   odsPrinter << ">";
 }
 
+LogicalResult
+IndexMapAttr::verify(llvm::function_ref<InFlightDiagnostic()> emitError,
+                     AffineMap value) {
+  // Affine map should only have symbols.
+  if (value.getNumDims() != 0)
+    return emitError() << "index map should not have any dimensions";
+  return success();
+}
+
 //===----------------------------------------------------------------------===//
 // TableGen'd op method definitions
 //===----------------------------------------------------------------------===//
