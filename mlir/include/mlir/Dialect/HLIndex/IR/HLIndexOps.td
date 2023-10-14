@@ -61,9 +61,11 @@ def HLIndexApplyOp : HLIndex_Op<"apply", [Pure]> {
   let extraClassDeclaration = [{
     /// Returns the affine map to be applied by this operation.
     AffineMap getIndexMap() { return getMap().getAffineMap(); }
+    /// Returns the affine expr result.
+    AffineExpr getIndexExpr() { return getIndexMap().getResult(0); }
   }];
 
-  // let hasCanonicalizer = 1;
+  let hasCanonicalizer = 1;
   let hasCustomAssemblyFormat = 1;
   let hasFolder = 1;
   let hasVerifier = 1;

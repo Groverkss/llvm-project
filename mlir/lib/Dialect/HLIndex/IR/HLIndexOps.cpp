@@ -7,6 +7,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "mlir/Dialect/HLIndex/IR/HLIndexOps.h"
+#include "mlir/IR/Matchers.h"
+#include "mlir/IR/PatternMatch.h"
 #include "llvm/Support/Debug.h"
 
 using namespace mlir;
@@ -48,16 +50,15 @@ void HLIndexApplyOp::print(OpAsmPrinter &p) {
 }
 
 LogicalResult HLIndexApplyOp::verify() {
-  // Check input and output dimensions match.
-  AffineMap affineMap = getIndexMap();
-
-  // Verify that operand count matches affine map dimension and symbol count.
-  if (getNumOperands() != affineMap.getNumSymbols())
-    return emitOpError("operand count and variable count must match");
+  AffineMap indexMap = getIndexMap();
 
   // Verify that the map only produces one result.
-  if (affineMap.getNumResults() != 1)
+  if (indexMap.getNumResults() != 1)
     return emitOpError("mapping must produce one value");
+
+  // Verify that operand count matches affine map symbol count.
+  if (getNumOperands() != indexMap.getNumSymbols())
+    return emitOpError("operand count and variable count must match");
 
   return success();
 }
@@ -84,3 +85,86 @@ OpFoldResult HLIndexApplyOp::fold(FoldAdaptor adaptor) {
     return {};
   return result[0];
 }
+
+static void canonicalizeIndexMap(AffineMap *indexMap,
+                                 SmallVectorImpl<Value> *operands) {
+  assert(indexMap->getNumInputs() == operands->size() &&
+         "map inputs must match number of operands");
+
+  if (!indexMap || operands->empty())
+    return;
+
+  // Check to see what vars are used.
+  llvm::SmallBitVector usedVars(indexMap->getNumInputs());
+  indexMap->walkExprs([&](AffineExpr expr) {
+    if (auto symExpr = expr.dyn_cast<AffineSymbolExpr>())
+      usedVars[symExpr.getPosition()] = true;
+  });
+
+  auto *context = indexMap->getContext();
+
+  SmallVector<Value, 8> resultOperands;
+  resultOperands.reserve(operands->size());
+
+  llvm::SmallDenseMap<Value, AffineExpr, 8> seenVars;
+  SmallVector<AffineExpr, 8> varRemapping(indexMap->getNumInputs());
+  unsigned nextSym = 0;
+  for (unsigned i = 0, e = indexMap->getNumInputs(); i != e; ++i) {
+    if (!usedVars[i])
+      continue;
+    // Handle constant operands.
+    IntegerAttr operandCst;
+    if (matchPattern((*operands)[i], m_Constant(&operandCst))) {
+      varRemapping[i] =
+          getAffineConstantExpr(operandCst.getValue().getSExtValue(), context);
+      continue;
+    }
+
+    // Remap var positions for duplicate operands.
+    auto it = seenVars.find((*operands)[i + indexMap->getNumDims()]);
+    if (it == seenVars.end()) {
+      varRemapping[i] = getAffineSymbolExpr(nextSym++, context);
+      resultOperands.push_back((*operands)[i]);
+      seenVars.insert(std::make_pair((*operands)[i], varRemapping[i]));
+    } else {
+      varRemapping[i] = it->second;
+    }
+  }
+  *indexMap = indexMap->replaceDimsAndSymbols({}, varRemapping, 0, nextSym);
+  *operands = resultOperands;
+}
+
+namespace {
+
+struct SimplifyHLIndexApplyOp : public OpRewritePattern<HLIndexApplyOp> {
+  using OpRewritePattern<HLIndexApplyOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(HLIndexApplyOp applyOp,
+                                PatternRewriter &rewriter) const override {
+    AffineMap map = applyOp.getIndexMap();
+    AffineMap oldMap = map;
+
+    auto oldOperands = applyOp.getMapOperands();
+    SmallVector<Value, 8> resultOperands(oldOperands);
+    // composeAffineMapAndOperands(&map, &resultOperands);
+    canonicalizeIndexMap(&map, &resultOperands);
+    // simplifyMapWithOperands(map, resultOperands);
+    if (map == oldMap && std::equal(oldOperands.begin(), oldOperands.end(),
+                                    resultOperands.begin()))
+      return failure();
+
+    rewriter.replaceOpWithNewOp<HLIndexApplyOp>(
+        applyOp, applyOp->getResultTypes(), IndexMapAttr::get(map),
+        resultOperands);
+
+    return success();
+  }
+};
+
+} // namespace
+
+void HLIndexApplyOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
+  results.add<SimplifyHLIndexApplyOp>(context);
+}
+
