@@ -86,12 +86,12 @@ OpFoldResult HLIndexApplyOp::fold(FoldAdaptor adaptor) {
   return result[0];
 }
 
-static void canonicalizeIndexMap(AffineMap *indexMap,
-                                 SmallVectorImpl<Value> *operands) {
-  assert(indexMap->getNumInputs() == operands->size() &&
-         "map inputs must match number of operands");
+static void canonicalizeIndexMapWithValues(AffineMap *indexMap,
+                                           SmallVectorImpl<Value> *values) {
+  assert(indexMap->getNumInputs() == values->size() &&
+         "map inputs must match number of values");
 
-  if (!indexMap || operands->empty())
+  if (!indexMap || values->empty())
     return;
 
   // Check to see what vars are used.
@@ -103,8 +103,8 @@ static void canonicalizeIndexMap(AffineMap *indexMap,
 
   auto *context = indexMap->getContext();
 
-  SmallVector<Value, 8> resultOperands;
-  resultOperands.reserve(operands->size());
+  SmallVector<Value, 8> resultValues;
+  resultValues.reserve(values->size());
 
   llvm::SmallDenseMap<Value, AffineExpr, 8> seenVars;
   SmallVector<AffineExpr, 8> varRemapping(indexMap->getNumInputs());
@@ -112,26 +112,26 @@ static void canonicalizeIndexMap(AffineMap *indexMap,
   for (unsigned i = 0, e = indexMap->getNumInputs(); i != e; ++i) {
     if (!usedVars[i])
       continue;
-    // Handle constant operands.
-    IntegerAttr operandCst;
-    if (matchPattern((*operands)[i], m_Constant(&operandCst))) {
+    // Handle constant values.
+    IntegerAttr valueCst;
+    if (matchPattern((*values)[i], m_Constant(&valueCst))) {
       varRemapping[i] =
-          getAffineConstantExpr(operandCst.getValue().getSExtValue(), context);
+          getAffineConstantExpr(valueCst.getValue().getSExtValue(), context);
       continue;
     }
 
-    // Remap var positions for duplicate operands.
-    auto it = seenVars.find((*operands)[i + indexMap->getNumDims()]);
+    // Remap var positions for duplicate values.
+    auto it = seenVars.find((*values)[i + indexMap->getNumDims()]);
     if (it == seenVars.end()) {
       varRemapping[i] = getAffineSymbolExpr(nextSym++, context);
-      resultOperands.push_back((*operands)[i]);
-      seenVars.insert(std::make_pair((*operands)[i], varRemapping[i]));
+      resultValues.push_back((*values)[i]);
+      seenVars.insert(std::make_pair((*values)[i], varRemapping[i]));
     } else {
       varRemapping[i] = it->second;
     }
   }
   *indexMap = indexMap->replaceDimsAndSymbols({}, varRemapping, 0, nextSym);
-  *operands = resultOperands;
+  *values = resultValues;
 }
 
 namespace {
@@ -147,8 +147,7 @@ struct SimplifyHLIndexApplyOp : public OpRewritePattern<HLIndexApplyOp> {
     auto oldOperands = applyOp.getMapOperands();
     SmallVector<Value, 8> resultOperands(oldOperands);
     // composeAffineMapAndOperands(&map, &resultOperands);
-    canonicalizeIndexMap(&map, &resultOperands);
-    // simplifyMapWithOperands(map, resultOperands);
+    canonicalizeIndexMapWithValues(&map, &resultOperands);
     if (map == oldMap && std::equal(oldOperands.begin(), oldOperands.end(),
                                     resultOperands.begin()))
       return failure();
