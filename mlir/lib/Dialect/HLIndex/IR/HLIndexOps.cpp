@@ -141,7 +141,86 @@ static void canonicalizeIndexMapWithValues(IndexValueMap &valueMap) {
   values = resultValues;
 }
 
-// static composeIndexMapWithValues() {}
+static LogicalResult replaceValue(IndexValueMap &valueMap, unsigned pos) {
+  Value &val = valueMap.values[pos];
+  if (!val)
+    return failure();
+
+  auto applyOp = val.getDefiningOp<HLIndexApplyOp>();
+  if (!applyOp)
+    return failure();
+
+  // At this point we will perform a replacement of `v`, set the entry in `dim`
+  // or `sym` to nullptr immediately.
+  val = nullptr;
+  AffineMap mapToCompose = applyOp.getIndexMap();
+  ValueRange valuesToCompose = applyOp.getMapOperands();
+
+  AffineMap &map = valueMap.indexMap;
+  SmallVectorImpl<Value> &values = valueMap.values;
+
+  AffineExpr replacementExpr =
+      mapToCompose.shiftSymbols(map.getNumInputs()).getResult(0);
+  AffineExpr toReplace = getAffineSymbolExpr(pos, map.getContext());
+
+  values.append(valuesToCompose.begin(), valuesToCompose.end());
+  map = map.replace(toReplace, replacementExpr, 0, values.size());
+
+  return success();
+}
+
+static void composeIndexMapWithValues(IndexValueMap &valueMap) {
+  AffineMap &map = valueMap.indexMap;
+
+  if (map.getNumResults() == 0) {
+    canonicalizeIndexMapWithValues(valueMap);
+    map = simplifyAffineMap(map);
+    return;
+  }
+
+  // Create a copy of the map and do composition on the copy.
+  IndexValueMap composedMap = valueMap;
+  while (true) {
+    bool changed = false;
+    for (unsigned pos = 0; pos != composedMap.values.size(); ++pos) {
+      if ((changed |= succeeded(replaceValue(composedMap, pos)))) {
+        break;
+      }
+    }
+    if (!changed)
+      break;
+  }
+
+  ArrayRef<Value> newValues = composedMap.values;
+
+  // Assign new map.
+  valueMap.indexMap = composedMap.indexMap;
+  // Clear all values in the valueMap, so we can fill them anew.
+  valueMap.values.clear();
+
+  // We may have introduced null values during compose, prune them out.
+  unsigned nVals = 0;
+  SmallVector<AffineExpr, 4> valReplacements;
+  valReplacements.reserve(newValues.size());
+  for (auto [index, value] : llvm::enumerate(newValues)) {
+    if (!value) {
+      assert(!valueMap.indexMap.isFunctionOfSymbol(index) &&
+             "map is a function of unexpected expr@pos");
+      valReplacements.push_back(getAffineConstantExpr(0, map.getContext()));
+      continue;
+    }
+    valReplacements.push_back(getAffineSymbolExpr(nVals++, map.getContext()));
+    valueMap.values.push_back(value);
+  }
+
+  // Replace and assign to valueMap.
+  valueMap.indexMap =
+      valueMap.indexMap.replaceDimsAndSymbols({}, valReplacements, 0, nVals);
+
+  // Canonicalize and simplify before returning.
+  canonicalizeIndexMapWithValues(valueMap);
+  valueMap.indexMap = simplifyAffineMap(valueMap.indexMap);
+}
 
 namespace {
 
@@ -154,7 +233,7 @@ struct SimplifyHLIndexApplyOp : public OpRewritePattern<HLIndexApplyOp> {
 
     IndexValueMap valueMap{map, applyOp.getMapOperands()};
 
-    // composeAffineMapAndOperands(&map, &resultOperands);
+    composeIndexMapWithValues(valueMap);
     canonicalizeIndexMapWithValues(valueMap);
     if (map == valueMap.indexMap && applyOp.getMapOperands() == valueMap.values)
       return failure();
