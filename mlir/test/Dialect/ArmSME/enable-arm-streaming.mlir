@@ -58,7 +58,7 @@ func.func @no_scalable_vectors(%vec: vector<4xf32>) -> vector<4xf32> {
 // IF-SCALABLE-NOT: arm_streaming
 func.func @contains_gather(%base: memref<?xf32>, %v: vector<[4]xindex>, %mask: vector<[4]xi1>, %pass_thru: vector<[4]xf32>) -> vector<[4]xf32> {
  %c0 = arith.constant 0 : index
- %0 = vector.gather %base[%c0][%v], %mask, %pass_thru : memref<?xf32>, vector<[4]xindex>, vector<[4]xi1>, vector<[4]xf32> into vector<[4]xf32>
+ %0 = vector.gather %base[%c0][%v : vector<[4]xindex>], %mask, %pass_thru : memref<?xf32>, vector<[4]xi1>, vector<[4]xf32> into vector<[4]xf32>
  return %0 : vector<[4]xf32>
 }
 
@@ -67,6 +67,6 @@ func.func @contains_gather(%base: memref<?xf32>, %v: vector<[4]xindex>, %mask: v
 func.func @contains_scatter(%base: memref<?xf32>, %v: vector<[4]xindex>,%mask: vector<[4]xi1>, %value: vector<[4]xf32>)
 {
   %c0 = arith.constant 0 : index
-  vector.scatter %base[%c0][%v], %mask, %value : memref<?xf32>, vector<[4]xindex>, vector<[4]xi1>, vector<[4]xf32>
+  vector.scatter %base[%c0][%v : vector<[4]xindex>], %mask, %value : memref<?xf32>, vector<[4]xi1>, vector<[4]xf32>
   return
 }

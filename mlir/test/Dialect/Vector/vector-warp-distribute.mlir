@@ -1305,7 +1305,7 @@ func.func @vector_insert_2d_broadcast(%laneid: index) -> (vector<4x96xf32>) {
 // CHECK-PROP: #[[$MAP:.*]] = affine_map<()[s0] -> (s0 * 2)>
 // CHECK-PROP-LABEL: func @transfer_read_prop_operands(
 //  CHECK-PROP-SAME:     %[[IN2:[^ :]*]]: vector<1x2xindex>,
-//  CHECK-PROP-SAME:     %[[AR1:[^ :]*]]: memref<1x4x2xi32>,
+//  CHECK-PROP-SAME:     %[[AR1:[^ :]*]]: memref<8xi32>,
 //  CHECK-PROP-SAME:     %[[AR2:[^ :]*]]: memref<1x4x1024xf32>)
 //   CHECK-PROP-DAG:   %[[C0:.*]] = arith.constant 0 : index
 //   CHECK-PROP-DAG:   %[[THREADID:.*]] = gpu.thread_id  x
@@ -1318,7 +1318,7 @@ func.func @vector_insert_2d_broadcast(%laneid: index) -> (vector<4x96xf32>) {
 //       CHECK-PROP:   %[[APPLY:.*]] = affine.apply #[[$MAP]]()[%[[THREADID]]]
 //       CHECK-PROP:   %[[TRANSFERREAD:.*]] = vector.transfer_read %[[AR2]][%[[C0]], %[[W]], %[[APPLY]]],
 //       CHECK-PROP:   return %[[TRANSFERREAD]]
-func.func @transfer_read_prop_operands(%in2: vector<1x2xindex>, %ar1 :  memref<1x4x2xi32>, %ar2 : memref<1x4x1024xf32>)-> vector<2xf32> {
+func.func @transfer_read_prop_operands(%in2: vector<1x2xindex>, %ar1 :  memref<8xi32>, %ar2 : memref<1x4x1024xf32>)-> vector<2xf32> {
   %0 = gpu.thread_id  x
   %c0_i32 = arith.constant 0 : index
   %c0 = arith.constant 0 : index
@@ -1330,7 +1330,7 @@ func.func @transfer_read_prop_operands(%in2: vector<1x2xindex>, %ar1 :  memref<1
 
   %18 = gpu.warp_execute_on_lane_0(%0)[32] args(%in2 : vector<1x2xindex>) -> (vector<2xf32>) {
   ^bb0(%arg4: vector<1x64xindex>):
-    %28 = vector.gather %ar1[%c0, %c0, %c0] [%arg4], %cst_0, %cst : memref<1x4x2xi32>, vector<1x64xindex>, vector<1x64xi1>, vector<1x64xi32> into vector<1x64xi32>
+    %28 = vector.gather %ar1[%c0] [%arg4: vector<1x64xindex>], %cst_0, %cst : memref<8xi32>, vector<1x64xi1>, vector<1x64xi32> into vector<1x64xi32>
     %29 = vector.extract %28[0] : vector<64xi32> from vector<1x64xi32>
     %30 = arith.index_cast %29 : vector<64xi32> to vector<64xindex>
     %36 = vector.extractelement %30[%c0_i32 : index] : vector<64xindex>

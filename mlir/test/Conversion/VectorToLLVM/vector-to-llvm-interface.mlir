@@ -1997,7 +1997,7 @@ func.func @masked_store_index_scalable(%arg0: memref<?xindex>, %arg1: vector<[16
 
 func.func @gather(%arg0: memref<?xf32>, %arg1: vector<3xi32>, %arg2: vector<3xi1>, %arg3: vector<3xf32>) -> vector<3xf32> {
   %0 = arith.constant 0: index
-  %1 = vector.gather %arg0[%0][%arg1], %arg2, %arg3 : memref<?xf32>, vector<3xi32>, vector<3xi1>, vector<3xf32> into vector<3xf32>
+  %1 = vector.gather %arg0[%0][%arg1 : vector<3xi32>], %arg2, %arg3 : memref<?xf32>, vector<3xi1>, vector<3xf32> into vector<3xf32>
   return %1 : vector<3xf32>
 }
 
@@ -2010,7 +2010,7 @@ func.func @gather(%arg0: memref<?xf32>, %arg1: vector<3xi32>, %arg2: vector<3xi1
 
 func.func @gather_scalable(%arg0: memref<?xf32>, %arg1: vector<[3]xi32>, %arg2: vector<[3]xi1>, %arg3: vector<[3]xf32>) -> vector<[3]xf32> {
   %0 = arith.constant 0: index
-  %1 = vector.gather %arg0[%0][%arg1], %arg2, %arg3 : memref<?xf32>, vector<[3]xi32>, vector<[3]xi1>, vector<[3]xf32> into vector<[3]xf32>
+  %1 = vector.gather %arg0[%0][%arg1 : vector<[3]xi32>], %arg2, %arg3 : memref<?xf32>, vector<[3]xi1>, vector<[3]xf32> into vector<[3]xf32>
   return %1 : vector<[3]xf32>
 }
 
@@ -2023,7 +2023,7 @@ func.func @gather_scalable(%arg0: memref<?xf32>, %arg1: vector<[3]xi32>, %arg2: 
 
 func.func @gather_global_memory(%arg0: memref<?xf32, 1>, %arg1: vector<3xi32>, %arg2: vector<3xi1>, %arg3: vector<3xf32>) -> vector<3xf32> {
   %0 = arith.constant 0: index
-  %1 = vector.gather %arg0[%0][%arg1], %arg2, %arg3 : memref<?xf32, 1>, vector<3xi32>, vector<3xi1>, vector<3xf32> into vector<3xf32>
+  %1 = vector.gather %arg0[%0][%arg1 : vector<3xi32>], %arg2, %arg3 : memref<?xf32, 1>, vector<3xi1>, vector<3xf32> into vector<3xf32>
   return %1 : vector<3xf32>
 }
 
@@ -2036,7 +2036,7 @@ func.func @gather_global_memory(%arg0: memref<?xf32, 1>, %arg1: vector<3xi32>, %
 
 func.func @gather_global_memory_scalable(%arg0: memref<?xf32, 1>, %arg1: vector<[3]xi32>, %arg2: vector<[3]xi1>, %arg3: vector<[3]xf32>) -> vector<[3]xf32> {
   %0 = arith.constant 0: index
-  %1 = vector.gather %arg0[%0][%arg1], %arg2, %arg3 : memref<?xf32, 1>, vector<[3]xi32>, vector<[3]xi1>, vector<[3]xf32> into vector<[3]xf32>
+  %1 = vector.gather %arg0[%0][%arg1 : vector<[3]xi32>], %arg2, %arg3 : memref<?xf32, 1>, vector<[3]xi1>, vector<[3]xf32> into vector<[3]xf32>
   return %1 : vector<[3]xf32>
 }
 
@@ -2050,7 +2050,7 @@ func.func @gather_global_memory_scalable(%arg0: memref<?xf32, 1>, %arg1: vector<
 
 func.func @gather_index(%arg0: memref<?xindex>, %arg1: vector<3xindex>, %arg2: vector<3xi1>, %arg3: vector<3xindex>) -> vector<3xindex> {
   %0 = arith.constant 0: index
-  %1 = vector.gather %arg0[%0][%arg1], %arg2, %arg3 : memref<?xindex>, vector<3xindex>, vector<3xi1>, vector<3xindex> into vector<3xindex>
+  %1 = vector.gather %arg0[%0][%arg1 : vector<3xindex>], %arg2, %arg3 : memref<?xindex>, vector<3xi1>, vector<3xindex> into vector<3xindex>
   return %1 : vector<3xindex>
 }
 
@@ -2063,7 +2063,7 @@ func.func @gather_index(%arg0: memref<?xindex>, %arg1: vector<3xindex>, %arg2: v
 
 func.func @gather_index_scalable(%arg0: memref<?xindex>, %arg1: vector<[3]xindex>, %arg2: vector<[3]xi1>, %arg3: vector<[3]xindex>) -> vector<[3]xindex> {
   %0 = arith.constant 0: index
-  %1 = vector.gather %arg0[%0][%arg1], %arg2, %arg3 : memref<?xindex>, vector<[3]xindex>, vector<[3]xi1>, vector<[3]xindex> into vector<[3]xindex>
+  %1 = vector.gather %arg0[%0][%arg1 : vector<[3]xindex>], %arg2, %arg3 : memref<?xindex>, vector<[3]xi1>, vector<[3]xindex> into vector<[3]xindex>
   return %1 : vector<[3]xindex>
 }
 
@@ -2077,7 +2077,7 @@ func.func @gather_index_scalable(%arg0: memref<?xindex>, %arg1: vector<[3]xindex
 
 func.func @gather_1d_from_2d(%arg0: memref<4x4xf32>, %arg1: vector<4xi32>, %arg2: vector<4xi1>, %arg3: vector<4xf32>) -> vector<4xf32> {
   %0 = arith.constant 3 : index
-  %1 = vector.gather %arg0[%0, %0][%arg1], %arg2, %arg3 : memref<4x4xf32>, vector<4xi32>, vector<4xi1>, vector<4xf32> into vector<4xf32>
+  %1 = vector.gather %arg0[%0, %0][None, %arg1 : vector<4xi32>], %arg2, %arg3 : memref<4x4xf32>, vector<4xi1>, vector<4xf32> into vector<4xf32>
   return %1 : vector<4xf32>
 }
 
@@ -2089,9 +2089,9 @@ func.func @gather_1d_from_2d(%arg0: memref<4x4xf32>, %arg1: vector<4xi32>, %arg2
 
 // -----
 
-func.func @gather_1d_from_2d_scalable(%arg0: memref<4x?xf32>, %arg1: vector<[4]xi32>, %arg2: vector<[4]xi1>, %arg3: vector<[4]xf32>) -> vector<[4]xf32> {
+func.func @gather_1d_from_2d_scalable(%arg0: memref<4x?xf32>, %arg1: vector<[4]xi32>, %arg2: vector<[4]xi32>, %arg3: vector<[4]xi1>, %arg4: vector<[4]xf32>) -> vector<[4]xf32> {
   %0 = arith.constant 3 : index
-  %1 = vector.gather %arg0[%0, %0][%arg1], %arg2, %arg3 : memref<4x?xf32>, vector<[4]xi32>, vector<[4]xi1>, vector<[4]xf32> into vector<[4]xf32>
+  %1 = vector.gather %arg0[%0, %0][%arg1 : vector<[4]xi32>, %arg2: vector<[4]xi32>], %arg3, %arg4 : memref<4x?xf32>, vector<[4]xi1>, vector<[4]xf32> into vector<[4]xf32>
   return %1 : vector<[4]xf32>
 }
 
@@ -2109,7 +2109,7 @@ func.func @gather_1d_from_2d_scalable(%arg0: memref<4x?xf32>, %arg1: vector<[4]x
 
 func.func @scatter(%arg0: memref<?xf32>, %arg1: vector<3xi32>, %arg2: vector<3xi1>, %arg3: vector<3xf32>) {
   %0 = arith.constant 0: index
-  vector.scatter %arg0[%0][%arg1], %arg2, %arg3 : memref<?xf32>, vector<3xi32>, vector<3xi1>, vector<3xf32>
+  vector.scatter %arg0[%0][%arg1 : vector<3xi32>], %arg2, %arg3 : memref<?xf32>, vector<3xi1>, vector<3xf32>
   return
 }
 
@@ -2121,7 +2121,7 @@ func.func @scatter(%arg0: memref<?xf32>, %arg1: vector<3xi32>, %arg2: vector<3xi
 
 func.func @scatter_scalable(%arg0: memref<?xf32>, %arg1: vector<[3]xi32>, %arg2: vector<[3]xi1>, %arg3: vector<[3]xf32>) {
   %0 = arith.constant 0: index
-  vector.scatter %arg0[%0][%arg1], %arg2, %arg3 : memref<?xf32>, vector<[3]xi32>, vector<[3]xi1>, vector<[3]xf32>
+  vector.scatter %arg0[%0][%arg1 : vector<[3]xi32>], %arg2, %arg3 : memref<?xf32>, vector<[3]xi1>, vector<[3]xf32>
   return
 }
 
@@ -2133,7 +2133,7 @@ func.func @scatter_scalable(%arg0: memref<?xf32>, %arg1: vector<[3]xi32>, %arg2:
 
 func.func @scatter_index(%arg0: memref<?xindex>, %arg1: vector<3xindex>, %arg2: vector<3xi1>, %arg3: vector<3xindex>) {
   %0 = arith.constant 0: index
-  vector.scatter %arg0[%0][%arg1], %arg2, %arg3 : memref<?xindex>, vector<3xindex>, vector<3xi1>, vector<3xindex>
+  vector.scatter %arg0[%0][%arg1 : vector<3xindex>], %arg2, %arg3 : memref<?xindex>, vector<3xi1>, vector<3xindex>
   return
 }
 
@@ -2145,7 +2145,7 @@ func.func @scatter_index(%arg0: memref<?xindex>, %arg1: vector<3xindex>, %arg2: 
 
 func.func @scatter_index_scalable(%arg0: memref<?xindex>, %arg1: vector<[3]xindex>, %arg2: vector<[3]xi1>, %arg3: vector<[3]xindex>) {
   %0 = arith.constant 0: index
-  vector.scatter %arg0[%0][%arg1], %arg2, %arg3 : memref<?xindex>, vector<[3]xindex>, vector<[3]xi1>, vector<[3]xindex>
+  vector.scatter %arg0[%0][%arg1 : vector<[3]xindex>], %arg2, %arg3 : memref<?xindex>, vector<[3]xi1>, vector<[3]xindex>
   return
 }
 
@@ -2157,7 +2157,7 @@ func.func @scatter_index_scalable(%arg0: memref<?xindex>, %arg1: vector<[3]xinde
 
 func.func @scatter_1d_into_2d(%arg0: memref<4x4xf32>, %arg1: vector<4xi32>, %arg2: vector<4xi1>, %arg3: vector<4xf32>) {
   %0 = arith.constant 3 : index
-  vector.scatter %arg0[%0, %0][%arg1], %arg2, %arg3 : memref<4x4xf32>, vector<4xi32>, vector<4xi1>, vector<4xf32>
+  vector.scatter %arg0[%0, %0][None, %arg1 : vector<4xi32>], %arg2, %arg3 : memref<4x4xf32>, vector<4xi1>, vector<4xf32>
   return
 }
 
@@ -2170,7 +2170,7 @@ func.func @scatter_1d_into_2d(%arg0: memref<4x4xf32>, %arg1: vector<4xi32>, %arg
 
 func.func @scatter_1d_into_2d_scalable(%arg0: memref<4x?xf32>, %arg1: vector<[4]xi32>, %arg2: vector<[4]xi1>, %arg3: vector<[4]xf32>) {
   %0 = arith.constant 3 : index
-  vector.scatter %arg0[%0, %0][%arg1], %arg2, %arg3 : memref<4x?xf32>, vector<[4]xi32>, vector<[4]xi1>, vector<[4]xf32>
+  vector.scatter %arg0[%0, %0][None, %arg1 : vector<[4]xi32>], %arg2, %arg3 : memref<4x?xf32>, vector<[4]xi1>, vector<[4]xf32>
   return
 }
 

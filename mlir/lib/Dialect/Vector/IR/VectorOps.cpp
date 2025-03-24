@@ -5229,11 +5229,79 @@ LogicalResult MaskedStoreOp::fold(FoldAdaptor adaptor,
 }
 
 //===----------------------------------------------------------------------===//
+// GatherOp/ScatterOp Utilities
+//===----------------------------------------------------------------------===//
+
+const char *kNonIndexedSymbol = "None";
+
+ParseResult vector::parseIndexVecs(
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &indexVecs,
+    SmallVectorImpl<Type> &indexVecTypes, ArrayAttr &indexed,
+    ArrayRef<OpAsmParser::UnresolvedOperand> indices) {
+  if (parser.parseLSquare())
+    return failure();
+
+  SMLoc loc;
+  SmallVector<bool> indexedArr;
+  while (parser.parseOptionalRSquare()) {
+    // Check if this is a contigously indexed dimension.
+    if (!parser.parseOptionalKeyword(kNonIndexedSymbol)) {
+      indexedArr.push_back(false);
+      (void)parser.parseOptionalComma();
+      continue;
+    }
+
+    OpAsmParser::UnresolvedOperand indexVec;
+    Type indexVecType;
+    if (parser.getCurrentLocation(&loc) || parser.parseOperand(indexVec) ||
+        parser.parseColon() || parser.parseType(indexVecType)) {
+      return parser.emitError(loc, "Expected `none` or `operand : type`");
+    }
+
+    indexVecs.push_back(indexVec);
+    indexVecTypes.push_back(indexVecType);
+    indexedArr.push_back(true);
+
+    (void)parser.parseOptionalComma();
+  }
+
+  // OpBuilder is only used as a helper to build an BoolArrayAttr.
+  OpBuilder b(parser.getContext());
+  indexed = b.getBoolArrayAttr(indexedArr);
+  return success();
+}
+
+void vector::printIndexVecs(OpAsmPrinter &p, Operation *op,
+                            OperandRange indexVecs, TypeRange indexVecTypes,
+                            ArrayAttr indexed, OperandRange indices) {
+  int64_t rank = indices.size();
+
+  SmallVector<bool> indexedArr =
+      llvm::to_vector(indexed.getAsValueRange<BoolAttr>());
+
+  int64_t currIndexDim = 0;
+  p << "[";
+  for (int64_t i : llvm::seq<int64_t>(rank)) {
+    if (indexedArr[i]) {
+      p << indexVecs[currIndexDim] << ": " << indexVecTypes[currIndexDim];
+      ++currIndexDim;
+    } else {
+      p << kNonIndexedSymbol;
+    }
+
+    if (i != rank - 1) {
+      p << ", ";
+    }
+  }
+  p << "]";
+}
+
+//===----------------------------------------------------------------------===//
 // GatherOp
 //===----------------------------------------------------------------------===//
 
 LogicalResult GatherOp::verify() {
-  VectorType indVType = getIndexVectorType();
   VectorType maskVType = getMaskVectorType();
   VectorType resVType = getVectorType();
   ShapedType baseType = getBaseType();
@@ -5245,12 +5313,26 @@ LogicalResult GatherOp::verify() {
     return emitOpError("base and result element type should match");
   if (llvm::size(getIndices()) != baseType.getRank())
     return emitOpError("requires ") << baseType.getRank() << " indices";
-  if (resVType.getShape() != indVType.getShape())
-    return emitOpError("expected result dim to match indices dim");
   if (resVType.getShape() != maskVType.getShape())
     return emitOpError("expected result dim to match mask dim");
   if (resVType != getPassThruVectorType())
     return emitOpError("expected pass_thru of same type as result type");
+  if (getIndexedArray().size() != getIndices().size()) {
+    return emitOpError(
+        "expected number of indices to match number of indexed values");
+  }
+
+  VectorType indVType;
+  for (int64_t i : llvm::seq<int64_t>(getIndexVecs().size())) {
+    if (!indVType) {
+      indVType = getIndexVectorType(i);
+      if (indVType.getShape() != resVType.getShape())
+        return emitOpError("expected result dim to match indices dim");
+    }
+    if (indVType != getIndexVectorType(i))
+      return emitOpError("All index vector types must match");
+  }
+
   return success();
 }
 
@@ -5259,7 +5341,7 @@ LogicalResult GatherOp::verify() {
 /// Returns the mask type expected by this operation. Mostly used for
 /// verification purposes. It requires the operation to be vectorized."
 Type GatherOp::getExpectedMaskType() {
-  auto vecType = this->getIndexVectorType();
+  auto vecType = getType();
   return VectorType::get(vecType.getShape(),
                          IntegerType::get(vecType.getContext(), /*width=*/1),
                          vecType.getScalableDims());
@@ -5312,8 +5394,10 @@ public:
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(GatherOp op,
                                 PatternRewriter &rewriter) const override {
-    if (failed(isZeroBasedContiguousSeq(op.getIndexVec())))
-      return failure();
+    for (Value indexVec : op.getIndexVecs()) {
+      if (failed(isZeroBasedContiguousSeq(indexVec)))
+        return failure();
+    }
 
     rewriter.replaceOpWithNewOp<MaskedLoadOp>(op, op.getType(), op.getBase(),
                                               op.getIndices(), op.getMask(),
@@ -5333,7 +5417,6 @@ void GatherOp::getCanonicalizationPatterns(RewritePatternSet &results,
 //===----------------------------------------------------------------------===//
 
 LogicalResult ScatterOp::verify() {
-  VectorType indVType = getIndexVectorType();
   VectorType maskVType = getMaskVectorType();
   VectorType valueVType = getVectorType();
   MemRefType memType = getMemRefType();
@@ -5342,10 +5425,24 @@ LogicalResult ScatterOp::verify() {
     return emitOpError("base and valueToStore element type should match");
   if (llvm::size(getIndices()) != memType.getRank())
     return emitOpError("requires ") << memType.getRank() << " indices";
-  if (valueVType.getShape() != indVType.getShape())
-    return emitOpError("expected valueToStore dim to match indices dim");
   if (valueVType.getShape() != maskVType.getShape())
     return emitOpError("expected valueToStore dim to match mask dim");
+  if (getIndexedArray().size() != getIndices().size()) {
+    return emitOpError(
+        "expected number of indices to match number of indexed values");
+  }
+
+  VectorType indVType;
+  for (int64_t i : llvm::seq<int64_t>(getIndexVecs().size())) {
+    if (!indVType) {
+      indVType = getIndexVectorType(i);
+      if (indVType.getShape() != valueVType.getShape())
+        return emitOpError("expected valueToStore dim to match indices dim");
+    }
+    if (indVType != getIndexVectorType(i))
+      return emitOpError("All index vector types must match");
+  }
+
   return success();
 }
 
@@ -5375,8 +5472,10 @@ public:
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(ScatterOp op,
                                 PatternRewriter &rewriter) const override {
-    if (failed(isZeroBasedContiguousSeq(op.getIndexVec())))
-      return failure();
+    for (Value indexVec : op.getIndexVecs()) {
+      if (failed(isZeroBasedContiguousSeq(indexVec)))
+        return failure();
+    }
 
     rewriter.replaceOpWithNewOp<MaskedStoreOp>(
         op, op.getBase(), op.getIndices(), op.getMask(), op.getValueToStore());

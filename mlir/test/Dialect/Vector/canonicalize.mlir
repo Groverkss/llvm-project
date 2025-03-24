@@ -1278,8 +1278,8 @@ func.func @dead_load(%base: memref<?xf32>, %indices: vector<16xi32>,
   %c0 = arith.constant 0 : index
   %0 = vector.maskedload %base[%c0], %mask, %passthru :
     memref<?xf32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
-  %1 = vector.gather %base[%c0][%indices], %mask, %passthru :
-    memref<?xf32>, vector<16xi32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
+  %1 = vector.gather %base[%c0][%indices : vector<16xi32>], %mask, %passthru :
+    memref<?xf32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
   %2 = vector.expandload %base[%c0], %mask, %passthru :
     memref<?xf32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
   return
@@ -3078,8 +3078,8 @@ func.func @contiguous_gather(%base: memref<?xf32>,
                              %mask: vector<16xi1>, %passthru: vector<16xf32>) -> vector<16xf32> {
   %c0 = arith.constant 0 : index
   %indices = arith.constant dense<[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]> : vector<16xi32>
-  %1 = vector.gather %base[%c0][%indices], %mask, %passthru :
-    memref<?xf32>, vector<16xi32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
+  %1 = vector.gather %base[%c0][%indices : vector<16xi32>], %mask, %passthru :
+    memref<?xf32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
   return %1 : vector<16xf32>
 }
 
@@ -3094,8 +3094,8 @@ func.func @contiguous_gather_non_zero_start(%base: memref<?xf32>,
                                             %passthru: vector<16xf32>) -> vector<16xf32> {
   %c0 = arith.constant 0 : index
   %indices = arith.constant dense<[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]> : vector<16xi32>
-  %1 = vector.gather %base[%c0][%indices], %mask, %passthru :
-    memref<?xf32>, vector<16xi32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
+  %1 = vector.gather %base[%c0][%indices : vector<16xi32>], %mask, %passthru :
+    memref<?xf32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
   return %1 : vector<16xf32>
 }
 
@@ -3109,8 +3109,8 @@ func.func @contiguous_gather_2d(%base: memref<?x?xf32>,
                                 %mask: vector<4x4xi1>, %passthru: vector<4x4xf32>) -> vector<4x4xf32> {
   %c0 = arith.constant 0 : index
   %indices = arith.constant dense<[[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]> : vector<4x4xi32>
-  %1 = vector.gather %base[%c0, %c0][%indices], %mask, %passthru :
-    memref<?x?xf32>, vector<4x4xi32>, vector<4x4xi1>, vector<4x4xf32> into vector<4x4xf32>
+  %1 = vector.gather %base[%c0, %c0][None, %indices : vector<4x4xi32>], %mask, %passthru :
+    memref<?x?xf32>, vector<4x4xi1>, vector<4x4xf32> into vector<4x4xf32>
   return %1 : vector<4x4xf32>
 }
 
@@ -3126,8 +3126,8 @@ func.func @contiguous_gather_const_mask(%base: memref<?xf32>,
   %c0 = arith.constant 0 : index
   %indices = arith.constant dense<[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]> : vector<16xi32>
   %mask = arith.constant dense<true> : vector<16xi1>
-  %1 = vector.gather %base[%c0][%indices], %mask, %passthru :
-    memref<?xf32>, vector<16xi32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
+  %1 = vector.gather %base[%c0][%indices : vector<16xi32>], %mask, %passthru :
+    memref<?xf32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
   return %1 : vector<16xf32>
 }
 
@@ -3142,8 +3142,8 @@ func.func @contiguous_gather_step(%base: memref<?xf32>,
                                   %mask: vector<16xi1>, %passthru: vector<16xf32>) -> vector<16xf32> {
   %c0 = arith.constant 0 : index
   %indices = vector.step : vector<16xindex>
-  %1 = vector.gather %base[%c0][%indices], %mask, %passthru :
-    memref<?xf32>, vector<16xindex>, vector<16xi1>, vector<16xf32> into vector<16xf32>
+  %1 = vector.gather %base[%c0][%indices : vector<16xindex>], %mask, %passthru :
+    memref<?xf32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
   return %1 : vector<16xf32>
 }
 
@@ -3157,8 +3157,8 @@ func.func @gather_broadcast(%base: memref<?xf32>,
                              %mask: vector<16xi1>, %passthru: vector<16xf32>) -> vector<16xf32> {
   %c0 = arith.constant 0 : index
   %indices = arith.constant dense<0> : vector<16xi32>
-  %1 = vector.gather %base[%c0][%indices], %mask, %passthru :
-    memref<?xf32>, vector<16xi32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
+  %1 = vector.gather %base[%c0][%indices : vector<16xi32>], %mask, %passthru :
+    memref<?xf32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
   return %1 : vector<16xf32>
 }
 
@@ -3172,8 +3172,8 @@ func.func @contiguous_scatter(%base: memref<?xf32>,
                               %mask: vector<16xi1>, %value: vector<16xf32>) {
   %c0 = arith.constant 0 : index
   %indices = arith.constant dense<[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]> : vector<16xi32>
-  vector.scatter %base[%c0][%indices], %mask, %value :
-    memref<?xf32>, vector<16xi32>, vector<16xi1>, vector<16xf32>
+  vector.scatter %base[%c0][%indices : vector<16xi32>], %mask, %value :
+    memref<?xf32>, vector<16xi1>, vector<16xf32>
   return
 }
 
@@ -3188,8 +3188,8 @@ func.func @contiguous_scatter_const_mask(%base: memref<?xf32>,
   %c0 = arith.constant 0 : index
   %indices = arith.constant dense<[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]> : vector<16xi32>
   %mask = vector.constant_mask [16] : vector<16xi1>
-  vector.scatter %base[%c0][%indices], %mask, %value :
-    memref<?xf32>, vector<16xi32>, vector<16xi1>, vector<16xf32>
+  vector.scatter %base[%c0][%indices : vector<16xi32>], %mask, %value :
+    memref<?xf32>, vector<16xi1>, vector<16xf32>
   return
 }
 
@@ -3203,8 +3203,8 @@ func.func @contiguous_scatter_step(%base: memref<?xf32>,
                                    %mask: vector<16xi1>, %value: vector<16xf32>) {
   %c0 = arith.constant 0 : index
   %indices = vector.step : vector<16xindex>
-  vector.scatter %base[%c0][%indices], %mask, %value :
-    memref<?xf32>, vector<16xindex>, vector<16xi1>, vector<16xf32>
+  vector.scatter %base[%c0][%indices : vector<16xindex>], %mask, %value :
+    memref<?xf32>, vector<16xi1>, vector<16xf32>
   return
 }
 

@@ -35,9 +35,9 @@
 // CHECK:         %[[li:.*]] = vector.load %{{.*}}[%[[i]]] : memref<?xi32>, vector<16xi32>
 // CHECK:         %[[zi:.*]] = arith.extui %[[li]] : vector<16xi32> to vector<16xi64>
 // CHECK:         %[[la:.*]] = vector.load %{{.*}}[%[[i]]] : memref<?xf32>, vector<16xf32>
-// CHECK:         %[[lb:.*]] = vector.gather %{{.*}}[%[[c0]]] [%[[zi]]], %[[mask]], %{{.*}} : memref<1024xf32>, vector<16xi64>, vector<16xi1>, vector<16xf32> into vector<16xf32>
+// CHECK:         %[[lb:.*]] = vector.gather %{{.*}}[%[[c0]]] [%[[zi]]: vector<16xi64>], %[[mask]], %{{.*}} : memref<1024xf32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
 // CHECK:         %[[m:.*]] = arith.mulf %[[la]], %[[lb]] : vector<16xf32>
-// CHECK:         vector.scatter %{{.*}}[%[[c0]]] [%[[zi]]], %[[mask]], %[[m]] : memref<1024xf32>, vector<16xi64>, vector<16xi1>, vector<16xf32>
+// CHECK:         vector.scatter %{{.*}}[%[[c0]]] [%[[zi]]: vector<16xi64>], %[[mask]], %[[m]] : memref<1024xf32>, vector<16xi1>, vector<16xf32>
 // CHECK:       }
 // CHECK:       scf.for %[[i2:.*]] = %[[boundary]] to %[[s]] step %[[c16]] {
 // CHECK:         %[[sub:.*]] = affine.apply #[[$map1]](%[[i2]])[%[[s]]]
@@ -45,9 +45,9 @@
 // CHECK:         %[[li2:.*]] = vector.maskedload %{{.*}}[%[[i2]]], %[[mask2]], %{{.*}} : memref<?xi32>, vector<16xi1>, vector<16xi32> into vector<16xi32>
 // CHECK:         %[[zi2:.*]] = arith.extui %[[li2]] : vector<16xi32> to vector<16xi64>
 // CHECK:         %[[la2:.*]] = vector.maskedload %{{.*}}[%[[i2]]], %[[mask2]], %{{.*}} : memref<?xf32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
-// CHECK:         %[[lb2:.*]] = vector.gather %{{.*}}[%[[c0]]] [%[[zi2]]], %[[mask2]], %{{.*}} : memref<1024xf32>, vector<16xi64>, vector<16xi1>, vector<16xf32> into vector<16xf32>
+// CHECK:         %[[lb2:.*]] = vector.gather %{{.*}}[%[[c0]]] [%[[zi2]]: vector<16xi64>], %[[mask2]], %{{.*}} : memref<1024xf32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
 // CHECK:         %[[m2:.*]] = arith.mulf %[[la2]], %[[lb2]] : vector<16xf32>
-// CHECK:         vector.scatter %{{.*}}[%[[c0]]] [%[[zi2]]], %[[mask2]], %[[m2]] : memref<1024xf32>, vector<16xi64>, vector<16xi1>, vector<16xf32>
+// CHECK:         vector.scatter %{{.*}}[%[[c0]]] [%[[zi2]]: vector<16xi64>], %[[mask2]], %[[m2]] : memref<1024xf32>, vector<16xi1>, vector<16xf32>
 // CHECK:       }
 // CHECK:       return
 //

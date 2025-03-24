@@ -39,7 +39,7 @@
 // CHECK:             %[[VAL_18:.*]] = vector.maskedload %[[VAL_10]]{{\[}}%[[VAL_14]]], %[[VAL_16]], %[[VAL_2]] : memref<?xi64>, vector<8xi1>, vector<8xi64> into vector<8xi64>
 // CHECK:             %[[VAL_19:.*]] = arith.index_cast %[[VAL_17]] : vector<8xindex> to vector<8xi64>
 // CHECK:             %[[VAL_20:.*]] = arith.muli %[[VAL_18]], %[[VAL_19]] : vector<8xi64>
-// CHECK:             vector.scatter %[[VAL_11]]{{\[}}%[[VAL_5]]] {{\[}}%[[VAL_17]]], %[[VAL_16]], %[[VAL_20]] : memref<8xi64>, vector<8xindex>, vector<8xi1>, vector<8xi64>
+// CHECK:             vector.scatter %[[VAL_11]]{{\[}}%[[VAL_5]]] {{\[}}%[[VAL_17]]: vector<8xindex>], %[[VAL_16]], %[[VAL_20]] : memref<8xi64>, vector<8xi1>, vector<8xi64>
 // CHECK:           } {"Emitted from" = "linalg.generic"}
 // CHECK:           %[[VAL_21:.*]] = bufferization.to_tensor %[[VAL_11]] : memref<8xi64>
 // CHECK:           return %[[VAL_21]] : tensor<8xi64>

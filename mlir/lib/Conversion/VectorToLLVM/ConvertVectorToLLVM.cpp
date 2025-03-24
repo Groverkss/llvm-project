@@ -85,8 +85,6 @@ LogicalResult getMemRefAlignment(const LLVMTypeConverter &typeConverter,
 // Check if the last stride is non-unit and has a valid memory space.
 static LogicalResult isMemRefTypeSupported(MemRefType memRefType,
                                            const LLVMTypeConverter &converter) {
-  if (!memRefType.isLastDimUnitStride())
-    return failure();
   if (failed(converter.getMemRefAddressSpace(memRefType)))
     return failure();
   return success();
@@ -254,6 +252,52 @@ public:
   }
 };
 
+static Value getLinearizedStridedIndex(Location loc, ValueRange indices,
+                                       MemRefType type, Value memRefDesc,
+                                       ConversionPatternRewriter &rewriter,
+                                       const LLVMTypeConverter &typeConv) {
+  auto [strides, offsets] = type.getStridesAndOffset();
+  MemRefDescriptor memRefDescriptor(memRefDesc);
+
+  Value index;
+  for (auto i : llvm::seq<int64_t>(indices.size())) {
+    Value increment = indices[i];
+    Type indexType = index ? index.getType() : increment.getType();
+    Type elType = typeConv.convertType(getElementTypeOrSelf(indexType));
+    // Skip if stride is 1.
+    if (strides[i] != 1) {
+      // Get the stride.
+      Value stride =
+          ShapedType::isDynamic(strides[i])
+              ? memRefDescriptor.stride(rewriter, loc, i)
+              : rewriter.create<LLVM::ConstantOp>(loc, elType, strides[i]);
+
+      // Force stride to be the same type as index vec types. It's weird to
+      // truncate/extend index vec types here because that is the input type
+      // passed. We assume here that the user knows what they are doing and the
+      // strides probably fit in the indices they are using.
+      if (stride.getType().getIntOrFloatBitWidth() <
+          elType.getIntOrFloatBitWidth()) {
+        stride = rewriter.create<LLVM::ZExtOp>(loc, elType, stride);
+      }
+      if (stride.getType().getIntOrFloatBitWidth() >
+          elType.getIntOrFloatBitWidth()) {
+        stride = rewriter.create<LLVM::TruncOp>(loc, elType, stride);
+      }
+
+      stride = rewriter.create<vector::SplatOp>(loc, stride, indexType);
+      increment = rewriter.create<LLVM::MulOp>(loc, increment, stride);
+    }
+
+    // It is possible that the increment has an element type that is different
+    // from the current increment type. If so, extend types to match.
+
+    index =
+        index ? rewriter.create<LLVM::AddOp>(loc, index, increment) : increment;
+  }
+  return index;
+}
+
 /// Conversion pattern for a vector.gather.
 class VectorGatherOpConversion
     : public ConvertOpToLLVMPattern<vector::GatherOp> {
@@ -283,13 +327,19 @@ public:
                                          "could not resolve memref alignment");
     }
 
+    // llvm.masked_gather only supports linearized index vectors.
+    Value indexVec = getLinearizedStridedIndex(loc, adaptor.getIndexVecs(),
+                                               memRefType, adaptor.getBase(),
+                                               rewriter, *getTypeConverter());
+    if (!indexVec) {
+      return failure();
+    }
     // Resolve address.
     Value ptr = getStridedElementPtr(loc, memRefType, adaptor.getBase(),
                                      adaptor.getIndices(), rewriter);
-    Value base = adaptor.getBase();
     Value ptrs =
         getIndexedPtrs(rewriter, loc, *this->getTypeConverter(), memRefType,
-                       base, ptr, adaptor.getIndexVec(), vType);
+                       adaptor.getBase(), ptr, indexVec, vType);
 
     // Replace with the gather intrinsic.
     rewriter.replaceOpWithNewOp<LLVM::masked_gather>(
@@ -327,13 +377,19 @@ public:
                                          "could not resolve memref alignment");
     }
 
+    // llvm.masked_gather only supports linearized index vectors.
+    Value indexVec = getLinearizedStridedIndex(loc, adaptor.getIndexVecs(),
+                                               memRefType, adaptor.getBase(),
+                                               rewriter, *getTypeConverter());
+    if (!indexVec) {
+      return failure();
+    }
     // Resolve address.
     Value ptr = getStridedElementPtr(loc, memRefType, adaptor.getBase(),
                                      adaptor.getIndices(), rewriter);
     Value ptrs =
         getIndexedPtrs(rewriter, loc, *this->getTypeConverter(), memRefType,
-                       adaptor.getBase(), ptr, adaptor.getIndexVec(), vType);
-
+                       adaptor.getBase(), ptr, indexVec, vType);
     // Replace with the scatter intrinsic.
     rewriter.replaceOpWithNewOp<LLVM::masked_scatter>(
         scatter, adaptor.getValueToStore(), ptrs, adaptor.getMask(),

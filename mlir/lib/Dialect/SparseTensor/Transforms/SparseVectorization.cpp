@@ -116,8 +116,11 @@ static Value genVectorLoad(PatternRewriter &rewriter, Location loc, VL vl,
     SmallVector<Value> scalarArgs(idxs);
     Value indexVec = idxs.back();
     scalarArgs.back() = constantIndex(rewriter, loc, 0);
-    return rewriter.create<vector::GatherOp>(loc, vtp, mem, scalarArgs,
-                                             indexVec, vmask, pass);
+    SmallVector<bool> indexed(idxs.size(), false);
+    indexed.back() = true;
+    return rewriter.create<vector::GatherOp>(
+        loc, vtp, mem, scalarArgs, ValueRange{indexVec},
+        rewriter.getBoolArrayAttr(indexed), vmask, pass);
   }
   return rewriter.create<vector::MaskedLoadOp>(loc, vtp, mem, idxs, vmask,
                                                pass);
@@ -133,8 +136,11 @@ static void genVectorStore(PatternRewriter &rewriter, Location loc, Value mem,
     SmallVector<Value> scalarArgs(idxs);
     Value indexVec = idxs.back();
     scalarArgs.back() = constantIndex(rewriter, loc, 0);
-    rewriter.create<vector::ScatterOp>(loc, mem, scalarArgs, indexVec, vmask,
-                                       rhs);
+    SmallVector<bool> indexed(idxs.size(), false);
+    indexed.back() = true;
+    rewriter.create<vector::ScatterOp>(
+        loc, mem, scalarArgs, ValueRange{indexVec},
+        rewriter.getBoolArrayAttr(indexed), vmask, rhs);
     return;
   }
   rewriter.create<vector::MaskedStoreOp>(loc, mem, idxs, vmask, rhs);
@@ -606,8 +612,8 @@ public:
 
   ForOpRewriter(MLIRContext *context, unsigned vectorLength,
                 bool enableVLAVectorization, bool enableSIMDIndex32)
-      : OpRewritePattern(context), vl{vectorLength, enableVLAVectorization,
-                                      enableSIMDIndex32} {}
+      : OpRewritePattern(context),
+        vl{vectorLength, enableVLAVectorization, enableSIMDIndex32} {}
 
   LogicalResult matchAndRewrite(scf::ForOp op,
                                 PatternRewriter &rewriter) const override {

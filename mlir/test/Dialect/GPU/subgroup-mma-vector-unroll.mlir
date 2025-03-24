@@ -64,7 +64,7 @@ func.func @gathered_matmul(%lhs: memref<32x32xf32>, %rhs: memref<32x32xf32>, %ou
   %6 = affine.apply affine_map<()[s0] -> ((s0 floordiv 32) * 16)>()[%3]
   // CHECK:         scf.for {{.*}} -> (vector<16x16xf32>) {
   // CHECK:           arith.addi {{.*}} : vector<4xindex>
-  // CHECK:           vector.gather {{.*}} : memref<32x32xf32>, vector<4x4xindex>, vector<4x4xi1>, vector<4x4xf32> into vector<4x4xf32>
+  // CHECK:           vector.gather {{.*}} : memref<32x32xf32>, vector<4x4xi1>, vector<4x4xf32> into vector<4x4xf32>
   // CHECK-COUNT-8:   vector.transfer_read {{.*}} vector<8x4xf32>
   // CHECK-COUNT-4:   vector.transfer_read {{.*}} vector<4x16xf32>
   // CHECK-COUNT-8:   vector.contract {{.*}} vector<8x4xf32>, vector<4x16xf32> into vector<8x16xf32>
@@ -74,8 +74,7 @@ func.func @gathered_matmul(%lhs: memref<32x32xf32>, %rhs: memref<32x32xf32>, %ou
     %10 = vector.broadcast %arg0 : index to vector<4xindex>
     %11 = arith.addi %10, %cst_1 : vector<4xindex>
     %12 = vector.broadcast %11 : vector<4xindex> to vector<4x4xindex>
-    %13 = arith.addi %12, %cst_2 : vector<4x4xindex>
-    %14 = vector.gather %lhs[%c0, %c0] [%13], %cst_mask, %cst_pt : memref<32x32xf32>, vector<4x4xindex>, vector<4x4xi1>, vector<4x4xf32> into vector<4x4xf32>
+    %14 = vector.gather %lhs[%c0, %c0] [%12: vector<4x4xindex>, %cst_2 : vector<4x4xindex>], %cst_mask, %cst_pt : memref<32x32xf32>, vector<4x4xi1>, vector<4x4xf32> into vector<4x4xf32>
     vector.transfer_write %14, %alloc[%c0, %c0] {in_bounds = [true, true]} : vector<4x4xf32>, memref<32x32xf32>
     gpu.barrier
     %15 = affine.apply affine_map<(d0)[s0] -> (d0 + s0)>(%c0)[%5]

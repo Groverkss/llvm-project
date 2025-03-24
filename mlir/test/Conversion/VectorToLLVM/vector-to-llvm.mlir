@@ -1664,7 +1664,7 @@ func.func @flat_transpose(%arg0: vector<16xf32>) -> vector<16xf32> {
 func.func @gather_with_mask(%arg0: memref<?xf32>, %arg1: vector<2x3xi32>, %arg2: vector<2x3xf32>) -> vector<2x3xf32> {
   %0 = arith.constant 0: index
   %1 = vector.constant_mask [2, 2] : vector<2x3xi1>
-  %2 = vector.gather %arg0[%0][%arg1], %1, %arg2 : memref<?xf32>, vector<2x3xi32>, vector<2x3xi1>, vector<2x3xf32> into vector<2x3xf32>
+  %2 = vector.gather %arg0[%0][%arg1 : vector<2x3xi32>], %1, %arg2 : memref<?xf32>, vector<2x3xi1>, vector<2x3xf32> into vector<2x3xf32>
   return %2 : vector<2x3xf32>
 }
 
@@ -1680,7 +1680,7 @@ func.func @gather_with_mask_scalable(%arg0: memref<?xf32>, %arg1: vector<2x[3]xi
   // dimensions, hence [2, 3] rather than [2, 2] as in the example for fixed
   // width vectors above.
   %1 = vector.constant_mask [2, 3] : vector<2x[3]xi1>
-  %2 = vector.gather %arg0[%0][%arg1], %1, %arg2 : memref<?xf32>, vector<2x[3]xi32>, vector<2x[3]xi1>, vector<2x[3]xf32> into vector<2x[3]xf32>
+  %2 = vector.gather %arg0[%0][%arg1 : vector<2x[3]xi32>], %1, %arg2 : memref<?xf32>, vector<2x[3]xi1>, vector<2x[3]xf32> into vector<2x[3]xf32>
   return %2 : vector<2x[3]xf32>
 }
 
@@ -1694,7 +1694,7 @@ func.func @gather_with_mask_scalable(%arg0: memref<?xf32>, %arg1: vector<2x[3]xi
 func.func @gather_with_zero_mask(%arg0: memref<?xf32>, %arg1: vector<2x3xi32>, %arg2: vector<2x3xf32>) -> vector<2x3xf32> {
   %0 = arith.constant 0: index
   %1 = vector.constant_mask [0, 0] : vector<2x3xi1>
-  %2 = vector.gather %arg0[%0][%arg1], %1, %arg2 : memref<?xf32>, vector<2x3xi32>, vector<2x3xi1>, vector<2x3xf32> into vector<2x3xf32>
+  %2 = vector.gather %arg0[%0][%arg1 : vector<2x3xi32>], %1, %arg2 : memref<?xf32>, vector<2x3xi1>, vector<2x3xf32> into vector<2x3xf32>
   return %2 : vector<2x3xf32>
 }
 
@@ -1708,7 +1708,7 @@ func.func @gather_with_zero_mask(%arg0: memref<?xf32>, %arg1: vector<2x3xi32>, %
 func.func @gather_with_zero_mask_scalable(%arg0: memref<?xf32>, %arg1: vector<2x[3]xi32>, %arg2: vector<2x[3]xf32>) -> vector<2x[3]xf32> {
   %0 = arith.constant 0: index
   %1 = vector.constant_mask [0, 0] : vector<2x[3]xi1>
-  %2 = vector.gather %arg0[%0][%arg1], %1, %arg2 : memref<?xf32>, vector<2x[3]xi32>, vector<2x[3]xi1>, vector<2x[3]xf32> into vector<2x[3]xf32>
+  %2 = vector.gather %arg0[%0][%arg1 : vector<2x[3]xi32>], %1, %arg2 : memref<?xf32>, vector<2x[3]xi1>, vector<2x[3]xf32> into vector<2x[3]xf32>
   return %2 : vector<2x[3]xf32>
 }
 
@@ -1729,7 +1729,7 @@ func.func @gather_with_zero_mask_scalable(%arg0: memref<?xf32>, %arg1: vector<2x
 func.func @scatter_with_mask(%arg0: memref<?xf32>, %arg1: vector<2x3xi32>, %arg2: vector<2x3xf32>) {
   %0 = arith.constant 0: index
   %1 = vector.constant_mask [2, 2] : vector<2x3xi1>
-  vector.scatter %arg0[%0][%arg1], %1, %arg2 : memref<?xf32>, vector<2x3xi32>, vector<2x3xi1>, vector<2x3xf32>
+  vector.scatter %arg0[%0][%arg1 : vector<2x3xi32>], %1, %arg2 : memref<?xf32>, vector<2x3xi1>, vector<2x3xf32>
   return
 }
 
@@ -1744,7 +1744,7 @@ func.func @scatter_with_mask_scalable(%arg0: memref<?xf32>, %arg1: vector<2x[3]x
   // dimensions, hence [2, 3] rather than [2, 2] as in the example for fixed
   // width vectors above.
   %1 = vector.constant_mask [2, 3] : vector<2x[3]xi1>
-  vector.scatter %arg0[%0][%arg1], %1, %arg2 : memref<?xf32>, vector<2x[3]xi32>, vector<2x[3]xi1>, vector<2x[3]xf32>
+  vector.scatter %arg0[%0][%arg1 : vector<2x[3]xi32>], %1, %arg2 : memref<?xf32>, vector<2x[3]xi1>, vector<2x[3]xf32>
   return
 }
 

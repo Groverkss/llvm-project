@@ -24,7 +24,7 @@
 // CHECK:         return [[RES1]] : vector<2xf32>
 func.func @gather_memref_1d(%base: memref<?xf32>, %v: vector<2xindex>, %mask: vector<2xi1>, %pass_thru: vector<2xf32>) -> vector<2xf32> {
   %c0 = arith.constant 0 : index
-  %0 = vector.gather %base[%c0][%v], %mask, %pass_thru : memref<?xf32>, vector<2xindex>, vector<2xi1>, vector<2xf32> into vector<2xf32>
+  %0 = vector.gather %base[%c0][%v : vector<2xindex>], %mask, %pass_thru : memref<?xf32>, vector<2xi1>, vector<2xf32> into vector<2xf32>
   return %0 : vector<2xf32>
 }
 
@@ -45,7 +45,7 @@ func.func @gather_memref_1d(%base: memref<?xf32>, %v: vector<2xindex>, %mask: ve
 // CHECK:         return [[RES1]] : vector<2xf32>
 func.func @gather_memref_1d_i32_index(%base: memref<?xf32>, %v: vector<2xi32>, %mask: vector<2xi1>, %pass_thru: vector<2xf32>) -> vector<2xf32> {
   %c0 = arith.constant 42 : index
-  %0 = vector.gather %base[%c0][%v], %mask, %pass_thru : memref<?xf32>, vector<2xi32>, vector<2xi1>, vector<2xf32> into vector<2xf32>
+  %0 = vector.gather %base[%c0][%v : vector<2xi32>], %mask, %pass_thru : memref<?xf32>, vector<2xi1>, vector<2xf32> into vector<2xf32>
   return %0 : vector<2xf32>
 }
 
@@ -70,7 +70,7 @@ func.func @gather_memref_1d_i32_index(%base: memref<?xf32>, %v: vector<2xi32>, %
  func.func @gather_memref_2d(%base: memref<?x?xf32>, %v: vector<2x3xindex>, %mask: vector<2x3xi1>, %pass_thru: vector<2x3xf32>) -> vector<2x3xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %0 = vector.gather %base[%c0, %c1][%v], %mask, %pass_thru : memref<?x?xf32>, vector<2x3xindex>, vector<2x3xi1>, vector<2x3xf32> into vector<2x3xf32>
+  %0 = vector.gather %base[%c0, %c1][%v: vector<2x3xindex>], %mask, %pass_thru : memref<?x?xf32>, vector<2x3xi1>, vector<2x3xf32> into vector<2x3xf32>
   return %0 : vector<2x3xf32>
  }
 

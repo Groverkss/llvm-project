@@ -157,8 +157,8 @@ struct GatherOpInterface
       return failure();
     replaceOpWithNewBufferizedOp<vector::GatherOp>(
         rewriter, gatherOp, gatherOp.getVectorType(), *buffer,
-        gatherOp.getIndices(), gatherOp.getIndexVec(), gatherOp.getMask(),
-        gatherOp.getPassThru());
+        gatherOp.getIndices(), gatherOp.getIndexVecs(), gatherOp.getIndexed(),
+        gatherOp.getMask(), gatherOp.getPassThru());
     return success();
   }
 };

@@ -71,7 +71,7 @@ struct UnrollGather : OpRewritePattern<vector::GatherOp> {
       return rewriter.notifyMatchFailure(op, "cannot unroll scalable dim");
 
     Location loc = op.getLoc();
-    Value indexVec = op.getIndexVec();
+    ValueRange indexVecs = op.getIndexVecs();
     Value maskVec = op.getMask();
     Value passThruVec = op.getPassThru();
 
@@ -81,22 +81,76 @@ struct UnrollGather : OpRewritePattern<vector::GatherOp> {
     VectorType subTy = VectorType::Builder(resultTy).dropDim(0);
 
     for (int64_t i = 0, e = resultTy.getShape().front(); i < e; ++i) {
-      int64_t thisIdx[1] = {i};
-
-      Value indexSubVec =
-          rewriter.create<vector::ExtractOp>(loc, indexVec, thisIdx);
-      Value maskSubVec =
-          rewriter.create<vector::ExtractOp>(loc, maskVec, thisIdx);
+      SmallVector<Value> indexSubVecs(indexVecs.size());
+      for (auto [index, indexVec] : llvm::enumerate(indexVecs)) {
+        indexSubVecs[index] =
+            rewriter.create<vector::ExtractOp>(loc, indexVec, i);
+      }
+      Value maskSubVec = rewriter.create<vector::ExtractOp>(loc, maskVec, i);
       Value passThruSubVec =
-          rewriter.create<vector::ExtractOp>(loc, passThruVec, thisIdx);
+          rewriter.create<vector::ExtractOp>(loc, passThruVec, i);
       Value subGather = rewriter.create<vector::GatherOp>(
-          loc, subTy, op.getBase(), op.getIndices(), indexSubVec, maskSubVec,
-          passThruSubVec);
-      result =
-          rewriter.create<vector::InsertOp>(loc, subGather, result, thisIdx);
+          loc, subTy, op.getBase(), op.getIndices(), indexSubVecs,
+          op.getIndexed(), maskSubVec, passThruSubVec);
+      result = rewriter.create<vector::InsertOp>(loc, subGather, result, i);
     }
 
     rewriter.replaceOp(op, result);
+    return success();
+  }
+};
+
+/// Unrolls 2 or more dimensional `vector.scatter` ops by unrolling the
+/// outermost dimension. For example:
+/// ```
+/// %g = vector.scatter %base[%c0][%v], %mask, %valueToStore : ...
+/// vector<2x3xf32>
+///
+/// ==>
+///
+/// %g0  = vector.extract %valueToStore[0] : vector<3xf32> from vector<2x3xf32>
+///        vector.scatter %base[%c0][%v0], %mask0, %g0
+/// %g1  = vector.extract %valueToStore[1] : vector<3xf32> from vector<2x3xf32>
+///        vector.scatter %base[%c0][%v0], %mask0, %g1
+/// ```
+///
+/// When applied exhaustively, this will produce a sequence of 1-d scatter ops.
+///
+/// Supports vector types with a fixed leading dimension.
+struct UnrollScatter : OpRewritePattern<vector::ScatterOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::ScatterOp op,
+                                PatternRewriter &rewriter) const override {
+    VectorType vectorTy = op.getVectorType();
+    if (vectorTy.getRank() < 2)
+      return rewriter.notifyMatchFailure(op, "already 1-D");
+
+    // Unrolling doesn't take vscale into account. Pattern is disabled for
+    // vectors with leading scalable dim(s).
+    if (vectorTy.getScalableDims().front())
+      return rewriter.notifyMatchFailure(op, "cannot unroll scalable dim");
+
+    Location loc = op.getLoc();
+    ValueRange indexVecs = op.getIndexVecs();
+    Value maskVec = op.getMask();
+    Value valueToStoreVec = op.getValueToStore();
+
+    for (int64_t i = 0, e = vectorTy.getShape().front(); i < e; ++i) {
+      SmallVector<Value> indexSubVecs(indexVecs.size());
+      for (auto [index, indexVec] : llvm::enumerate(indexVecs)) {
+        indexSubVecs[index] =
+            rewriter.create<vector::ExtractOp>(loc, indexVec, i);
+      }
+      Value maskSubVec = rewriter.create<vector::ExtractOp>(loc, maskVec, i);
+      Value valueToStoreSubVec =
+          rewriter.create<vector::ExtractOp>(loc, valueToStoreVec, i);
+      rewriter.create<vector::ScatterOp>(loc, op.getBase(), op.getIndices(),
+                                         indexSubVecs, op.getIndexed(),
+                                         maskSubVec, valueToStoreSubVec);
+    }
+
+    rewriter.eraseOp(op);
     return success();
   }
 };
@@ -163,20 +217,24 @@ struct RemoveStrideFromGatherSource : OpRewritePattern<vector::GatherOp> {
         op.getLoc(), subview.getSource(), reassoc);
 
     // 2. Generate new gather indices that will model the
-    // strided access.
-    IntegerAttr stride = rewriter.getIndexAttr(srcTrailingDim);
-    VectorType vType = op.getIndexVec().getType();
-    Value mulCst = rewriter.create<arith::ConstantOp>(
-        op.getLoc(), vType, DenseElementsAttr::get(vType, stride));
+    // strided access by linearizing the indices.
+    Value newIdxs;
+    auto newIndexed = op.getIndexed();
+    // TODO: Fix
+    // IntegerAttr stride = rewriter.getIndexAttr(srcTrailingDim);
+    // VectorType vType = op.getIndexVec().getType();
+    // Value mulCst = rewriter.create<arith::ConstantOp>(
+    //     op.getLoc(), vType, DenseElementsAttr::get(vType, stride));
 
-    Value newIdxs =
-        rewriter.create<arith::MulIOp>(op.getLoc(), op.getIndexVec(), mulCst);
+    // Value newIdxs =
+    //     rewriter.create<arith::MulIOp>(op.getLoc(), op.getIndexVec(),
+    //     mulCst);
 
     // 3. Create an updated gather op with the collapsed input memref and the
     // updated indices.
     Value newGather = rewriter.create<vector::GatherOp>(
         op.getLoc(), op.getResult().getType(), collapsed, op.getIndices(),
-        newIdxs, op.getMask(), op.getPassThru());
+        newIdxs, newIndexed, op.getMask(), op.getPassThru());
     rewriter.replaceOp(op, newGather);
 
     return success();
@@ -194,7 +252,8 @@ struct Gather1DToConditionalLoads : OpRewritePattern<vector::GatherOp> {
     VectorType resultTy = op.getType();
     if (resultTy.getRank() != 1)
       return rewriter.notifyMatchFailure(op, "unsupported rank");
-
+    if (op.getIndexedArray().size() != 1)
+      return rewriter.notifyMatchFailure(op, "not a gather load");
     if (resultTy.isScalable())
       return rewriter.notifyMatchFailure(op, "not a fixed-width vector");
 
@@ -218,8 +277,8 @@ struct Gather1DToConditionalLoads : OpRewritePattern<vector::GatherOp> {
     }
 
     Value indexVec = rewriter.createOrFold<arith::IndexCastOp>(
-        loc, op.getIndexVectorType().clone(rewriter.getIndexType()),
-        op.getIndexVec());
+        loc, op.getIndexVectorType(0).clone(rewriter.getIndexType()),
+        op.getIndexVecs()[0]);
     auto baseOffsets = llvm::to_vector(op.getIndices());
     Value lastBaseOffset = baseOffsets.back();
 

@@ -139,9 +139,9 @@ func.func @scale_d(%arga: tensor<1024xf32, #DenseVector>, %b: f32, %argx: tensor
 // CHECK-VEC16:         %[[li:.*]] = vector.maskedload %{{.*}}[%[[i]]], %[[mask]], %{{.*}} : memref<?xi32>, vector<16xi1>, vector<16xi32> into vector<16xi32>
 // CHECK-VEC16:         %[[zi:.*]] = arith.extui %[[li]] : vector<16xi32> to vector<16xi64>
 // CHECK-VEC16:         %[[la:.*]] = vector.maskedload %{{.*}}[%[[i]]], %[[mask]], %{{.*}} : memref<?xf32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
-// CHECK-VEC16:         %[[lb:.*]] = vector.gather %{{.*}}[%[[c0]]] [%[[zi]]], %[[mask]], %{{.*}} : memref<1024xf32>, vector<16xi64>, vector<16xi1>, vector<16xf32> into vector<16xf32>
+// CHECK-VEC16:         %[[lb:.*]] = vector.gather %{{.*}}[%[[c0]]] [%[[zi]]: vector<16xi64>], %[[mask]], %{{.*}} : memref<1024xf32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
 // CHECK-VEC16:         %[[m:.*]] = arith.mulf %[[la]], %[[lb]] : vector<16xf32>
-// CHECK-VEC16:         vector.scatter %{{.*}}[%[[c0]]] [%[[zi]]], %[[mask]], %[[m]] : memref<1024xf32>, vector<16xi64>, vector<16xi1>, vector<16xf32>
+// CHECK-VEC16:         vector.scatter %{{.*}}[%[[c0]]] [%[[zi]]: vector<16xi64>], %[[mask]], %[[m]] : memref<1024xf32>, vector<16xi1>, vector<16xf32>
 // CHECK-VEC16:       }
 // CHECK-VEC16:       return
 //
@@ -161,9 +161,9 @@ func.func @scale_d(%arga: tensor<1024xf32, #DenseVector>, %b: f32, %argx: tensor
 // CHECK-VEC16-IDX32:         %[[mask:.*]] = vector.create_mask %[[sub]] : vector<16xi1>
 // CHECK-VEC16-IDX32:         %[[li:.*]] = vector.maskedload %{{.*}}[%[[i]]], %[[mask]], %{{.*}} : memref<?xi32>, vector<16xi1>, vector<16xi32> into vector<16xi32>
 // CHECK-VEC16-IDX32:         %[[la:.*]] = vector.maskedload %{{.*}}[%[[i]]], %[[mask]], %{{.*}} : memref<?xf32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
-// CHECK-VEC16-IDX32:         %[[lb:.*]] = vector.gather %{{.*}}[%[[c0]]] [%[[li]]], %[[mask]], %{{.*}} : memref<1024xf32>, vector<16xi32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
+// CHECK-VEC16-IDX32:         %[[lb:.*]] = vector.gather %{{.*}}[%[[c0]]] [%[[li]]: vector<16xi32>], %[[mask]], %{{.*}} : memref<1024xf32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
 // CHECK-VEC16-IDX32:         %[[m:.*]] = arith.mulf %[[la]], %[[lb]] : vector<16xf32>
-// CHECK-VEC16-IDX32:         vector.scatter %{{.*}}[%[[c0]]] [%[[li]]], %[[mask]], %[[m]] : memref<1024xf32>, vector<16xi32>, vector<16xi1>, vector<16xf32>
+// CHECK-VEC16-IDX32:         vector.scatter %{{.*}}[%[[c0]]] [%[[li]]: vector<16xi32>], %[[mask]], %[[m]] : memref<1024xf32>, vector<16xi1>, vector<16xf32>
 // CHECK-VEC16-IDX32:       }
 // CHECK-VEC16-IDX32:       return
 //
@@ -188,9 +188,9 @@ func.func @scale_d(%arga: tensor<1024xf32, #DenseVector>, %b: f32, %argx: tensor
 // CHECK-VEC4-SVE:         %[[li:.*]] = vector.maskedload %{{.*}}[%[[i]]], %[[mask]], %[[v0i]] : memref<?xi32>, vector<[4]xi1>, vector<[4]xi32> into vector<[4]xi32>
 // CHECK-VEC4-SVE:         %[[lii64:.*]] = arith.extui %[[li]] : vector<[4]xi32> to vector<[4]xi64>
 // CHECK-VEC4-SVE:         %[[la:.*]] = vector.maskedload %{{.*}}[%[[i]]], %[[mask]], %[[v0f]] : memref<?xf32>, vector<[4]xi1>, vector<[4]xf32> into vector<[4]xf32>
-// CHECK-VEC4-SVE:         %[[lb:.*]] = vector.gather %{{.*}}[%[[c0]]] [%[[lii64]]], %[[mask]], %[[v0f]] : memref<1024xf32>, vector<[4]xi64>, vector<[4]xi1>, vector<[4]xf32> into vector<[4]xf32>
+// CHECK-VEC4-SVE:         %[[lb:.*]] = vector.gather %{{.*}}[%[[c0]]] [%[[lii64]]: vector<[4]xi64>], %[[mask]], %[[v0f]] : memref<1024xf32>, vector<[4]xi1>, vector<[4]xf32> into vector<[4]xf32>
 // CHECK-VEC4-SVE:         %[[m:.*]] = arith.mulf %[[la]], %[[lb]] : vector<[4]xf32>
-// CHECK-VEC4-SVE:         vector.scatter %{{.*}}[%[[c0]]] [%[[lii64]]], %[[mask]], %[[m]] : memref<1024xf32>, vector<[4]xi64>, vector<[4]xi1>, vector<[4]xf32>
+// CHECK-VEC4-SVE:         vector.scatter %{{.*}}[%[[c0]]] [%[[lii64]]: vector<[4]xi64>], %[[mask]], %[[m]] : memref<1024xf32>, vector<[4]xi1>, vector<[4]xf32>
 // CHECK-VEC4-SVE:       }
 // CHECK-VEC4-SVE:       return
 //
@@ -369,9 +369,9 @@ func.func @reduction_d(%arga: tensor<1024xf32, #DenseVector>,
 // CHECK-VEC16:           %[[lj:.*]] = vector.maskedload %{{.*}}[%[[j]]], %[[mask]], %{{.*}} : memref<?xi32>, vector<16xi1>, vector<16xi32> into vector<16xi32>
 // CHECK-VEC16:           %[[zj:.*]] = arith.extui %[[lj]] : vector<16xi32> to vector<16xi64>
 // CHECK-VEC16:           %[[la:.*]] = vector.maskedload %{{.*}}[%[[j]]], %[[mask]], %{{.*}} : memref<?xf32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
-// CHECK-VEC16:           %[[lb:.*]] = vector.gather %{{.*}}[%[[i]], %[[c0]]] [%[[zj]]], %[[mask]], %{{.*}} : memref<512x1024xf32>, vector<16xi64>, vector<16xi1>, vector<16xf32> into vector<16xf32>
+// CHECK-VEC16:           %[[lb:.*]] = vector.gather %{{.*}}[%[[i]], %[[c0]]] [None, %[[zj]]: vector<16xi64>], %[[mask]], %{{.*}} : memref<512x1024xf32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
 // CHECK-VEC16:           %[[m:.*]] = arith.mulf %[[la]], %[[lb]] : vector<16xf32>
-// CHECK-VEC16:           vector.scatter %{{.*}}[%[[i]], %[[c0]]] [%[[zj]]], %[[mask]], %[[m]] : memref<512x1024xf32>, vector<16xi64>, vector<16xi1>, vector<16xf32>
+// CHECK-VEC16:           vector.scatter %{{.*}}[%[[i]], %[[c0]]] [None, %[[zj]]: vector<16xi64>], %[[mask]], %[[m]] : memref<512x1024xf32>, vector<16xi1>, vector<16xf32>
 // CHECK-VEC16:         }
 // CHECK-VEC16:       }
 // CHECK-VEC16:       return
@@ -395,9 +395,9 @@ func.func @reduction_d(%arga: tensor<1024xf32, #DenseVector>,
 // CHECK-VEC16-IDX32:           %[[mask:.*]] = vector.create_mask %[[sub]] : vector<16xi1>
 // CHECK-VEC16-IDX32:           %[[lj:.*]] = vector.maskedload %{{.*}}[%[[j]]], %[[mask]], %{{.*}} : memref<?xi32>, vector<16xi1>, vector<16xi32> into vector<16xi32>
 // CHECK-VEC16-IDX32:           %[[la:.*]] = vector.maskedload %{{.*}}[%[[j]]], %[[mask]], %{{.*}} : memref<?xf32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
-// CHECK-VEC16-IDX32:           %[[lb:.*]] = vector.gather %{{.*}}[%[[i]], %[[c0]]] [%[[lj]]], %[[mask]], %{{.*}} : memref<512x1024xf32>, vector<16xi32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
+// CHECK-VEC16-IDX32:           %[[lb:.*]] = vector.gather %{{.*}}[%[[i]], %[[c0]]] [None, %[[lj]]: vector<16xi32>], %[[mask]], %{{.*}} : memref<512x1024xf32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
 // CHECK-VEC16-IDX32:           %[[m:.*]] = arith.mulf %[[la]], %[[lb]] : vector<16xf32>
-// CHECK-VEC16-IDX32:           vector.scatter %{{.*}}[%[[i]], %[[c0]]] [%[[lj]]], %[[mask]], %[[m]] : memref<512x1024xf32>, vector<16xi32>, vector<16xi1>, vector<16xf32>
+// CHECK-VEC16-IDX32:           vector.scatter %{{.*}}[%[[i]], %[[c0]]] [None, %[[lj]]: vector<16xi32>], %[[mask]], %[[m]] : memref<512x1024xf32>, vector<16xi1>, vector<16xf32>
 // CHECK-VEC16-IDX32:         }
 // CHECK-VEC16-IDX32:       }
 // CHECK-VEC16-IDX32:       return
@@ -426,9 +426,9 @@ func.func @reduction_d(%arga: tensor<1024xf32, #DenseVector>,
 // CHECK-VEC4-SVE:           %[[lji32:.*]] = vector.maskedload %{{.*}}[%[[j]]], %[[mask]], %[[v0i]] : memref<?xi32>, vector<[4]xi1>, vector<[4]xi32> into vector<[4]xi32>
 // CHECK-VEC4-SVE:           %[[lj:.*]] = arith.extui %[[lji32]] : vector<[4]xi32> to vector<[4]xi64>
 // CHECK-VEC4-SVE:           %[[la:.*]] = vector.maskedload %{{.*}}[%[[j]]], %[[mask]], %[[v0f]] : memref<?xf32>, vector<[4]xi1>, vector<[4]xf32> into vector<[4]xf32>
-// CHECK-VEC4-SVE:           %[[lb:.*]] = vector.gather %{{.*}}[%[[i]], %[[c0]]] [%[[lj]]], %[[mask]], %[[v0f]] : memref<512x1024xf32>, vector<[4]xi64>, vector<[4]xi1>, vector<[4]xf32> into vector<[4]xf32>
+// CHECK-VEC4-SVE:           %[[lb:.*]] = vector.gather %{{.*}}[%[[i]], %[[c0]]] [None, %[[lj]]: vector<[4]xi64>], %[[mask]], %[[v0f]] : memref<512x1024xf32>, vector<[4]xi1>, vector<[4]xf32> into vector<[4]xf32>
 // CHECK-VEC4-SVE:           %[[m:.*]] = arith.mulf %[[la]], %[[lb]] : vector<[4]xf32>
-// CHECK-VEC4-SVE:           vector.scatter %{{.*}}[%[[i]], %[[c0]]] [%[[lj]]], %[[mask]], %[[m]] : memref<512x1024xf32>, vector<[4]xi64>, vector<[4]xi1>, vector<[4]xf32>
+// CHECK-VEC4-SVE:           vector.scatter %{{.*}}[%[[i]], %[[c0]]] [None, %[[lj]]: vector<[4]xi64>], %[[mask]], %[[m]] : memref<512x1024xf32>, vector<[4]xi1>, vector<[4]xf32>
 // CHECK-VEC4-SVE:         }
 // CHECK-VEC4-SVE:       }
 // CHECK-VEC4-SVE:       return
@@ -492,10 +492,10 @@ func.func @mul_ds(%arga: tensor<512x1024xf32, #SparseMatrix>,
 // CHECK-VEC16:           %[[sub:.*]] = affine.min #[[$map]](%[[hi]], %[[jj]])[%[[c16]]]
 // CHECK-VEC16:           %[[mask:.*]] = vector.create_mask %[[sub]] : vector<16xi1>
 // CHECK-VEC16:           %[[j:.*]] = vector.maskedload %{{.*}}[%[[jj]]], %[[mask]], %{{.*}} : memref<?xindex>
-// CHECK-VEC16:           %[[x:.*]] = vector.gather %{{.*}}[%[[i1]], %[[c0]]] [%[[j]]], %[[mask]], %{{.*}} : memref<33x64xf64>
+// CHECK-VEC16:           %[[x:.*]] = vector.gather %{{.*}}[%[[i1]], %[[c0]]] [None, %[[j]]: vector<16xindex>], %[[mask]], %{{.*}} : memref<33x64xf64>
 // CHECK-VEC16:           %[[a:.*]] = vector.maskedload %{{.*}}[%[[jj]]], %[[mask]], %{{.*}} : memref<?xf64>
 // CHECK-VEC16:           %[[s:.*]] = arith.addf %[[x]], %[[a]] : vector<16xf64>
-// CHECK-VEC16:           vector.scatter %{{.*}}[%[[i1]], %[[c0]]] [%[[j]]], %[[mask]], %[[s]] : memref<33x64xf64>
+// CHECK-VEC16:           vector.scatter %{{.*}}[%[[i1]], %[[c0]]] [None, %[[j]]: vector<16xindex>], %[[mask]], %[[s]] : memref<33x64xf64>
 // CHECK-VEC16:         }
 // CHECK-VEC16:       }
 // CHECK-VEC16:       return
@@ -514,10 +514,10 @@ func.func @mul_ds(%arga: tensor<512x1024xf32, #SparseMatrix>,
 // CHECK-VEC16-IDX32:           %[[sub:.*]] = affine.min #[[$map]](%[[hi]], %[[jj]])[%[[c16]]]
 // CHECK-VEC16-IDX32:           %[[mask:.*]] = vector.create_mask %[[sub]] : vector<16xi1>
 // CHECK-VEC16-IDX32:           %[[j:.*]] = vector.maskedload %{{.*}}[%[[jj]]], %[[mask]], %{{.*}} : memref<?xindex>
-// CHECK-VEC16-IDX32:           %[[x:.*]] = vector.gather %{{.*}}[%[[i1]], %[[c0]]] [%[[j]]], %[[mask]], %{{.*}} : memref<33x64xf64>
+// CHECK-VEC16-IDX32:           %[[x:.*]] = vector.gather %{{.*}}[%[[i1]], %[[c0]]] [None, %[[j]]: vector<16xindex>], %[[mask]], %{{.*}} : memref<33x64xf64>
 // CHECK-VEC16-IDX32:           %[[a:.*]] = vector.maskedload %{{.*}}[%[[jj]]], %[[mask]], %{{.*}} : memref<?xf64>
 // CHECK-VEC16-IDX32:           %[[s:.*]] = arith.addf %[[x]], %[[a]] : vector<16xf64>
-// CHECK-VEC16-IDX32:           vector.scatter %{{.*}}[%[[i1]], %[[c0]]] [%[[j]]], %[[mask]], %[[s]] : memref<33x64xf64>
+// CHECK-VEC16-IDX32:           vector.scatter %{{.*}}[%[[i1]], %[[c0]]] [None, %[[j]]: vector<16xindex>], %[[mask]], %[[s]] : memref<33x64xf64>
 // CHECK-VEC16-IDX32:         }
 // CHECK-VEC16-IDX32:       }
 // CHECK-VEC16-IDX32:       return
@@ -540,10 +540,10 @@ func.func @mul_ds(%arga: tensor<512x1024xf32, #SparseMatrix>,
 // CHECK-VEC4-SVE:           %[[sub:.*]] = affine.min #[[$map]](%[[hi]], %[[jj]])[%[[step]]]
 // CHECK-VEC4-SVE:           %[[mask:.*]] = vector.create_mask %[[sub]] : vector<[4]xi1>
 // CHECK-VEC4-SVE:           %[[j:.*]] = vector.maskedload %{{.*}}[%[[jj]]], %[[mask]], %[[v0idx]] : memref<?xindex>
-// CHECK-VEC4-SVE:           %[[x:.*]] = vector.gather %{{.*}}[%[[i1]], %[[c0]]] [%[[j]]], %[[mask]], %[[v0f64]] : memref<33x64xf64>
+// CHECK-VEC4-SVE:           %[[x:.*]] = vector.gather %{{.*}}[%[[i1]], %[[c0]]] [None, %[[j]]: vector<[4]xindex>], %[[mask]], %[[v0f64]] : memref<33x64xf64>
 // CHECK-VEC4-SVE:           %[[a:.*]] = vector.maskedload %{{.*}}[%[[jj]]], %[[mask]], %[[v0f64]] : memref<?xf64>
 // CHECK-VEC4-SVE:           %[[s:.*]] = arith.addf %[[x]], %[[a]] : vector<[4]xf64>
-// CHECK-VEC4-SVE:           vector.scatter %{{.*}}[%[[i1]], %[[c0]]] [%[[j]]], %[[mask]], %[[s]] : memref<33x64xf64>
+// CHECK-VEC4-SVE:           vector.scatter %{{.*}}[%[[i1]], %[[c0]]] [None, %[[j]]: vector<[4]xindex>], %[[mask]], %[[s]] : memref<33x64xf64>
 // CHECK-VEC4-SVE:         }
 // CHECK-VEC4-SVE:       }
 // CHECK-VEC4-SVE:       return

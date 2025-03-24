@@ -612,8 +612,13 @@ struct UnrollGatherPattern : public OpRewritePattern<vector::GatherOp> {
       // To get the unrolled gather, extract the same slice based on the
       // decomposed shape from each of the index, mask, and pass-through
       // vectors.
-      Value indexSubVec = rewriter.createOrFold<vector::ExtractStridedSliceOp>(
-          loc, gatherOp.getIndexVec(), elementOffsets, *targetShape, strides);
+      SmallVector<Value> indexSubVecs;
+      for (Value indexVec : gatherOp.getIndexVecs()) {
+        Value indexSubVec =
+            rewriter.createOrFold<vector::ExtractStridedSliceOp>(
+                loc, indexVec, elementOffsets, *targetShape, strides);
+        indexSubVecs.push_back(indexSubVec);
+      }
       Value maskSubVec = rewriter.createOrFold<vector::ExtractStridedSliceOp>(
           loc, gatherOp.getMask(), elementOffsets, *targetShape, strides);
       Value passThruSubVec =
@@ -622,7 +627,7 @@ struct UnrollGatherPattern : public OpRewritePattern<vector::GatherOp> {
               strides);
       auto slicedGather = rewriter.create<vector::GatherOp>(
           loc, targetType, gatherOp.getBase(), gatherOp.getIndices(),
-          indexSubVec, maskSubVec, passThruSubVec);
+          indexSubVecs, gatherOp.getIndexed(), maskSubVec, passThruSubVec);
 
       result = rewriter.createOrFold<vector::InsertStridedSliceOp>(
           loc, slicedGather, result, elementOffsets, strides);

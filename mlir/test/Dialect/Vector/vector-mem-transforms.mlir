@@ -84,13 +84,13 @@ func.func @maskedstore2(%base: memref<16xf32>, %value: vector<16xf32>)  {
 // CHECK-SAME:                  %[[A2:.*]]: vector<16xf32>) -> vector<16xf32> {
 // CHECK-NEXT:      %[[C:.*]] = arith.constant 0 : index
 // CHECK-NEXT:      %[[M:.*]] = vector.constant_mask [16] : vector<16xi1>
-// CHECK-NEXT:      %[[G:.*]] = vector.gather %[[A0]][%[[C]]] [%[[A1]]], %[[M]], %[[A2]] : memref<16xf32>, vector<16xi32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
+// CHECK-NEXT:      %[[G:.*]] = vector.gather %[[A0]][%[[C]]] [%[[A1]]: vector<16xi32>], %[[M]], %[[A2]] : memref<16xf32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
 // CHECK-NEXT:      return %[[G]] : vector<16xf32>
 func.func @gather1(%base: memref<16xf32>, %indices: vector<16xi32>, %pass_thru: vector<16xf32>) -> vector<16xf32> {
   %c0 = arith.constant 0 : index
   %mask = vector.constant_mask [16] : vector<16xi1>
-  %ld = vector.gather %base[%c0][%indices], %mask, %pass_thru
-    : memref<16xf32>, vector<16xi32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
+  %ld = vector.gather %base[%c0][%indices : vector<16xi32>], %mask, %pass_thru
+    : memref<16xf32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
   return %ld : vector<16xf32>
 }
 
@@ -102,8 +102,8 @@ func.func @gather1(%base: memref<16xf32>, %indices: vector<16xi32>, %pass_thru: 
 func.func @gather2(%base: memref<16xf32>, %indices: vector<16xi32>, %pass_thru: vector<16xf32>) -> vector<16xf32> {
   %c0 = arith.constant 0 : index
   %mask = vector.constant_mask [0] : vector<16xi1>
-  %ld = vector.gather %base[%c0][%indices], %mask, %pass_thru
-    : memref<16xf32>, vector<16xi32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
+  %ld = vector.gather %base[%c0][%indices: vector<16xi32>], %mask, %pass_thru
+    : memref<16xf32>, vector<16xi1>, vector<16xf32> into vector<16xf32>
   return %ld : vector<16xf32>
 }
 
@@ -113,13 +113,13 @@ func.func @gather2(%base: memref<16xf32>, %indices: vector<16xi32>, %pass_thru: 
 // CHECK-SAME:                   %[[A2:.*]]: vector<16xf32>) {
 // CHECK-NEXT:      %[[C:.*]] = arith.constant 0 : index
 // CHECK-NEXT:      %[[M:.*]] = vector.constant_mask [16] : vector<16xi1>
-// CHECK-NEXT:      vector.scatter %[[A0]][%[[C]]] [%[[A1]]], %[[M]], %[[A2]] : memref<16xf32>, vector<16xi32>, vector<16xi1>, vector<16xf32>
+// CHECK-NEXT:      vector.scatter %[[A0]][%[[C]]] [%[[A1]]: vector<16xi32>], %[[M]], %[[A2]] : memref<16xf32>, vector<16xi1>, vector<16xf32>
 // CHECK-NEXT:      return
 func.func @scatter1(%base: memref<16xf32>, %indices: vector<16xi32>, %value: vector<16xf32>) {
   %c0 = arith.constant 0 : index
   %mask = vector.constant_mask [16] : vector<16xi1>
-  vector.scatter %base[%c0][%indices], %mask, %value
-    : memref<16xf32>, vector<16xi32>, vector<16xi1>, vector<16xf32>
+  vector.scatter %base[%c0][%indices: vector<16xi32>], %mask, %value
+    : memref<16xf32>, vector<16xi1>, vector<16xf32>
   return
 }
 
@@ -132,8 +132,8 @@ func.func @scatter2(%base: memref<16xf32>, %indices: vector<16xi32>, %value: vec
   %c0 = arith.constant 0 : index
   %0 = vector.type_cast %base : memref<16xf32> to memref<vector<16xf32>>
   %mask = vector.constant_mask [0] : vector<16xi1>
-  vector.scatter %base[%c0][%indices], %mask, %value
-    : memref<16xf32>, vector<16xi32>, vector<16xi1>, vector<16xf32>
+  vector.scatter %base[%c0][%indices : vector<16xi32>], %mask, %value
+    : memref<16xf32>, vector<16xi1>, vector<16xf32>
   return
 }
 

@@ -206,6 +206,15 @@ Operation *maskOperation(OpBuilder &builder, Operation *maskableOp, Value mask,
 Value selectPassthru(OpBuilder &builder, Value mask, Value newValue,
                      Value passthru);
 
+ParseResult
+parseIndexVecs(OpAsmParser &parser,
+               SmallVectorImpl<OpAsmParser::UnresolvedOperand> &indexVecs,
+               SmallVectorImpl<Type> &indexVecTypes, ArrayAttr &indexed,
+               ArrayRef<OpAsmParser::UnresolvedOperand> indices);
+void printIndexVecs(OpAsmPrinter &printer, Operation *op,
+                    OperandRange indexVecs, TypeRange indexVecTypes,
+                    ArrayAttr indexed, OperandRange indices);
+
 } // namespace vector
 } // namespace mlir
 
